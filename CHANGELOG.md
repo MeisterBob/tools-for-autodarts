@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.25] - 2025-01-XX
+
+### Added
+- Added range trigger support for Sound FX feature
+  - Sound FX now supports point range triggers (e.g., `100-180` or `ambient_100-180`) similar to Caller and WLED features
+  - Range triggers match numeric point values within the specified range (e.g., `ambient_140` matches `100-180`)
+  - Supports both `ambient_` prefixed and non-prefixed range trigger formats
+  - Range triggers are checked in multiple fallback paths to ensure comprehensive matching
+
+### Enhanced
+- Enhanced Sound FX trigger matching logic with improved range trigger support
+  - Added range trigger validation in initial filter, fallback paths, and final numeric checks
+  - Improved handling of `ambient_` prefix in range triggers for better compatibility
+  - Added debug logging to help diagnose range trigger matching during development
+  - Range triggers now work consistently across all Sound FX trigger scenarios
+
+### Changed
+- Updated README.md documentation to include range trigger information for Sound FX feature
+  - Added documentation for point range triggers format (`ambient_100-180` or `100-180`)
+  - Clarified that range triggers work with or without the `ambient_` prefix
+
+## [2.1.24] - 2025-11-20
+
+### Added
+- Added proxy server implementation for webhook forwarding
+  - Introduced a new proxy server using Express to forward webhooks with error handling
+  - Added Dockerfile for containerization of the proxy service
+  - Updated wxt.config.ts to include a new allowed URL for the proxy server
+  - Created package.json for managing dependencies of the proxy server
+
+### Fixed
+- Fixed WLED range trigger bug and regex
+  - Fixed incorrect loop condition in isTriggerPresent that caused crashes/failures with multiple range effects
+  - Updated range regex to support 'range_min_max' format as per documentation (supports both hyphens and underscores)
+
+### Enhanced
+- Enhanced URL validation and warning in WLED settings
+  - Added a warning message for HTTP URLs to inform users about potential mixed content issues
+  - Updated URL validation logic to accept both HTTP and HTTPS URLs for CSV parsing and effect saving, ensuring better user experience and security compliance
+
 ## [2.1.23] - 2025-11-19
 
 ### Added

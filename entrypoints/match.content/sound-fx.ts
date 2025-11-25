@@ -1,6 +1,6 @@
 import { AutodartsToolsGameData, type IGameData } from "@/utils/game-data-storage";
 import { AutodartsToolsConfig, type IConfig, type ISound } from "@/utils/storage";
-import { getSoundFxFromIndexedDB, isIndexedDBAvailable } from "@/utils/helpers";
+import { getSoundFxFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
 
 let gameDataWatcherUnwatch: any;
 let lobbyDataWatcherUnwatch: any;
@@ -819,9 +819,42 @@ function playSound(trigger: string, soundChannel: number = 1): void {
   }
 
   // Find all sounds that match the trigger
-  let matchingSounds = config.soundFx.sounds.filter(sound =>
-    sound.enabled && sound.triggers && sound.triggers.includes(trigger),
-  );
+  let matchingSounds = config.soundFx.sounds.filter((sound) => {
+    if (!sound.enabled || !sound.triggers) return false;
+
+    // Check for direct match
+    if (sound.triggers.includes(trigger)) return true;
+
+    // Validate range triggers of sound
+    // Extract number from trigger (handle ambient_ prefix)
+    let triggerNum = Number(trigger);
+    if (Number.isNaN(triggerNum) && trigger.startsWith("ambient_")) {
+      triggerNum = Number(trigger.replace("ambient_", ""));
+    }
+
+    if (!Number.isNaN(triggerNum)) {
+      const rangeTriggers = sound.triggers.map((t: string) => {
+        // Check both with and without ambient_ prefix
+        const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
+        const match = triggerToCheck.match(triggerPatterns.ranges);
+        if (!match) return null;
+        return { min: Number(match[1]), max: Number(match[2]), original: t };
+      }).filter(x => x !== null);
+
+      const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
+        const { min, max, original } = rangeTrigger;
+        const matches = triggerNum >= min && triggerNum <= max;
+        if (matches) {
+          console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
+        }
+        return matches;
+      });
+
+      if (hasMatchingRange) return true;
+    }
+
+    return false;
+  });
 
   // If no direct match, try to find a fallback without the ambient_ prefix
   if (!matchingSounds.length && trigger.startsWith("ambient_")) {
@@ -969,9 +1002,35 @@ function playSound(trigger: string, soundChannel: number = 1): void {
 
     // Standard fallback to non-ambient version if we haven't found matches yet
     if (!matchingSounds.length) {
-      matchingSounds = config.soundFx.sounds.filter(sound =>
-        sound.enabled && sound.triggers && sound.triggers.includes(withoutAmbientPrefix),
-      );
+      matchingSounds = config.soundFx.sounds.filter((sound) => {
+        if (!sound.enabled || !sound.triggers) return false;
+
+        // Check for direct match
+        if (sound.triggers.includes(withoutAmbientPrefix)) return true;
+
+        // Validate range triggers of sound for numeric triggers
+        const triggerNum = Number(withoutAmbientPrefix);
+        if (!Number.isNaN(triggerNum)) {
+          const rangeTriggers = sound.triggers.map((t: string) => {
+            const match = t.match(triggerPatterns.ranges);
+            if (!match) return null;
+            return { min: Number(match[1]), max: Number(match[2]), original: t };
+          }).filter(x => x !== null);
+
+          const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
+            const { min, max, original } = rangeTrigger;
+            const matches = triggerNum >= min && triggerNum <= max;
+            if (matches) {
+              console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
+            }
+            return matches;
+          });
+
+          if (hasMatchingRange) return true;
+        }
+
+        return false;
+      });
 
       if (matchingSounds.length) {
         console.log(`Autodarts Tools: Using fallback sound for "${trigger}" -> "${withoutAmbientPrefix}"`);
@@ -1178,20 +1237,110 @@ function playSound(trigger: string, soundChannel: number = 1): void {
     const number = trigger.substring(9);
     console.log(`Autodarts Tools: Trying fallback from "${trigger}" to "ambient_${number}"`);
 
-    matchingSounds = config.soundFx.sounds.filter(sound =>
-      sound.enabled && sound.triggers && sound.triggers.includes(`ambient_${number}`),
-    );
+    matchingSounds = config.soundFx.sounds.filter((sound) => {
+      if (!sound.enabled || !sound.triggers) return false;
+
+      // Check for direct match
+      if (sound.triggers.includes(`ambient_${number}`)) return true;
+
+      // Validate range triggers
+      const triggerNum = Number(number);
+      if (!Number.isNaN(triggerNum)) {
+        const rangeTriggers = sound.triggers.map((t: string) => {
+          // Check both with and without ambient_ prefix
+          const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
+          const match = triggerToCheck.match(triggerPatterns.ranges);
+          if (!match) return null;
+          return { min: Number(match[1]), max: Number(match[2]), original: t };
+        }).filter(x => x !== null);
+
+        const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
+          const { min, max, original } = rangeTrigger;
+          const matches = triggerNum >= min && triggerNum <= max;
+          if (matches) {
+            console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
+          }
+          return matches;
+        });
+
+        if (hasMatchingRange) return true;
+      }
+
+      return false;
+    });
 
     if (matchingSounds.length) {
       console.log(`Autodarts Tools: Using fallback sound for "${trigger}" -> "ambient_${number}"`);
     } else {
       // Try without ambient prefix
-      matchingSounds = config.soundFx.sounds.filter(sound =>
-        sound.enabled && sound.triggers && sound.triggers.includes(number),
-      );
+      matchingSounds = config.soundFx.sounds.filter((sound) => {
+        if (!sound.enabled || !sound.triggers) return false;
+
+        // Check for direct match
+        if (sound.triggers.includes(number)) return true;
+
+        // Validate range triggers
+        const triggerNum = Number(number);
+        if (!Number.isNaN(triggerNum)) {
+          const rangeTriggers = sound.triggers.map((t: string) => {
+            // Check both with and without ambient_ prefix
+            const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
+            const match = triggerToCheck.match(triggerPatterns.ranges);
+            if (!match) return null;
+            return { min: Number(match[1]), max: Number(match[2]), original: t };
+          }).filter(x => x !== null);
+
+          const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
+            const { min, max, original } = rangeTrigger;
+            const matches = triggerNum >= min && triggerNum <= max;
+            if (matches) {
+              console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
+            }
+            return matches;
+          });
+
+          if (hasMatchingRange) return true;
+        }
+
+        return false;
+      });
 
       if (matchingSounds.length) {
         console.log(`Autodarts Tools: Using fallback sound for "${trigger}" -> "${number}"`);
+      }
+    }
+  }
+
+  // Final check: if trigger is a number (with or without ambient_ prefix), check range triggers
+  if (!matchingSounds.length) {
+    // Extract number from trigger (handle ambient_ prefix)
+    let triggerNum = Number(trigger);
+    if (Number.isNaN(triggerNum) && trigger.startsWith("ambient_")) {
+      triggerNum = Number(trigger.replace("ambient_", ""));
+    }
+
+    if (!Number.isNaN(triggerNum)) {
+      const rangeTriggers = config.soundFx.sounds.filter((sound) => {
+        if (!sound.enabled || !sound.triggers) return false;
+
+        return sound.triggers.some((t: string) => {
+          // Check both with and without ambient_ prefix
+          const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
+          const match = triggerToCheck.match(triggerPatterns.ranges);
+          if (!match) return false;
+          const min = Number(match[1]);
+          const max = Number(match[2]);
+          const matches = triggerNum >= min && triggerNum <= max;
+          if (matches) {
+            console.log(`Autodarts Tools: Range trigger "${t}" matches ${triggerNum} (range: ${min}-${max})`);
+          }
+          return matches;
+        });
+      });
+
+      if (rangeTriggers.length) {
+        console.log(`Autodarts Tools: Found range trigger match for "${trigger}" (value: ${triggerNum})`);
+        matchingSounds = rangeTriggers;
       }
     }
   }
