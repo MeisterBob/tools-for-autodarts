@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.1.26] - 2025-01-XX
+## [2.1.27] - 2025-12-09
+
+### Enhanced
+- Enhanced QR Code Tournament feature layout and styling
+  - Changed QR code container to clone the parent element structure instead of creating a new div
+  - QR code is now placed directly inside the parent container instead of after the table element
+  - Added custom margin styling (negative top margin and bottom margin) for better spacing
+  - Updated border radius to use fixed 20px value instead of CSS variable
+
+## [2.1.26] - 2025-12-09
 
 ### Added
 - Added scale setting for Quick Correction feature
@@ -25,7 +34,7 @@ All notable changes to this project will be documented in this file.
   - Updated feature configuration to mark Quick Correction as having settings
   - Added Quick Correction to settings IDs array for proper modal integration
 
-## [2.1.25] - 2025-01-XX
+## [2.1.25] - 2025-12-09
 
 ### Added
 - Added range trigger support for Sound FX feature
