@@ -386,7 +386,7 @@ Takeout;https://wled-device.local/win/PL=3;takeout;busted
 
 #### Troubleshooting
 - **Effect Not Triggering**: Check that the trigger spelling matches exactly
-- **HTTPS Errors**: Ensure your WLED device supports HTTPS or use a proxy
+- **HTTPS Errors**: Ensure your WLED device supports HTTPS
 - **Board Filtering**: Verify board IDs are correctly formatted UUIDs
 - **URL Format**: Confirm WLED URLs follow the correct API format
 

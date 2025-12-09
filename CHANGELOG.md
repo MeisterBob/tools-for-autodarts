@@ -25,13 +25,6 @@ All notable changes to this project will be documented in this file.
 
 ## [2.1.24] - 2025-11-20
 
-### Added
-- Added proxy server implementation for webhook forwarding
-  - Introduced a new proxy server using Express to forward webhooks with error handling
-  - Added Dockerfile for containerization of the proxy service
-  - Updated wxt.config.ts to include a new allowed URL for the proxy server
-  - Created package.json for managing dependencies of the proxy server
-
 ### Fixed
 - Fixed WLED range trigger bug and regex
   - Fixed incorrect loop condition in isTriggerPresent that caused crashes/failures with multiple range effects
