@@ -181,7 +181,7 @@
             <Zoom @toggle="openSettingsModal('zoom')" @setting-change="updateConfig" class="feature-card" data-feature-index="20" />
 
             <!-- Ninth row of feature cards -->
-            <QuickCorrection @setting-change="updateConfig" class="feature-card" data-feature-index="21" />
+            <QuickCorrection @toggle="openSettingsModal('quick-correction')" @setting-change="updateConfig" class="feature-card" data-feature-index="21" />
 
             <!-- Tenth row of feature cards -->
             <EnhancedScoringDisplay @setting-change="updateConfig" class="feature-card" data-feature-index="22" />
@@ -317,10 +317,10 @@ const featureGroups = [
 
       { id: "automatic-fullscreen", title: "Automatic Fullscreen Settings", component: AutomaticFullscreen, hasSettings: false },
       { id: "zoom", title: "Darts Zoom Settings", component: Zoom, hasSettings: true },
-      { id: "quick-correction", title: "Quick Correction Settings", component: QuickCorrection, hasSettings: false },
+      { id: "quick-correction", title: "Quick Correction Settings", component: QuickCorrection, hasSettings: true },
       { id: "instant-replay", title: "Instant Replay Settings", component: InstantReplay, hasSettings: true },
     ],
-    settingIds: [ "colors", "next-player-on-takeout-stuck", "automatic-next-leg", "streaming-mode", "larger-legs-sets", "larger-player-names", "larger-player-match-data", "automatic-fullscreen", "zoom", "instant-replay" ],
+    settingIds: [ "colors", "next-player-on-takeout-stuck", "automatic-next-leg", "streaming-mode", "larger-legs-sets", "larger-player-names", "larger-player-match-data", "automatic-fullscreen", "zoom", "quick-correction", "instant-replay" ],
   },
   // Boards (Tab 2)
   {

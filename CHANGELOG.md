@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.26] - 2025-01-XX
+
+### Added
+- Added scale setting for Quick Correction feature
+  - Introduced configurable scale slider (0.5x to 2.0x) in Quick Correction settings
+  - Scale setting allows users to adjust the size of the correction window to their preference
+  - Scale value is saved in config and persists across sessions
+  - Added migration to initialize scale property for existing users (defaults to 1.0)
+
+### Enhanced
+- Enhanced Quick Correction window positioning to prevent viewport overflow
+  - Improved horizontal positioning logic to account for scale factor and maintain viewport boundaries
+  - Added vertical positioning checks to prevent window from going below or above viewport
+  - Window now automatically repositions above throw element if it doesn't fit below
+  - Added CSS constraints (maxWidth, maxHeight) as fallback to prevent overflow
+  - Window centers horizontally when viewport is too small to fit at original position
+
+### Fixed
+- Fixed Quick Correction settings modal not opening when clicking on feature card
+  - Added missing @toggle event handler in PageConfig component
+  - Updated feature configuration to mark Quick Correction as having settings
+  - Added Quick Correction to settings IDs array for proper modal integration
+
 ## [2.1.25] - 2025-01-XX
 
 ### Added

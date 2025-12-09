@@ -14,9 +14,14 @@
       :style="{
         position: 'absolute',
         left: `${correctionContainerX}px`,
-        top: `calc(${correctionContainerY}px + 1rem)`,
+        top: `${correctionContainerY}px`,
         width: `calc(${correctionContainerWidth}px + 7rem)`,
-        transform: 'translateX(-3.5rem)',
+        maxWidth: 'calc(100vw - 32px)',
+        maxHeight: 'calc(100vh - 32px)',
+        transform: `translateX(-3.5rem) scale(${correctionScale})`,
+        transformOrigin: 'top center',
+        zIndex: 10000,
+        overflow: 'hidden',
       }"
     >
       <div class="grid grid-cols-3 gap-2 text-center">
@@ -97,6 +102,7 @@
 import { waitForElement } from "@/utils";
 import AppButton from "@/components/AppButton.vue";
 import { AutodartsToolsGameData } from "@/utils/game-data-storage";
+import { AutodartsToolsConfig } from "@/utils/storage";
 import { getAuthToken } from "@/utils/helpers";
 
 interface Correction {
@@ -227,6 +233,7 @@ const currentGrid = ref<string[][]>([]);
 const currentGridIndex = ref<number>(-1);
 const currentThrowText = ref<string>("");
 const currentThrowIndex = ref<number>(-1);
+const correctionScale = ref<number>(1);
 
 watch(open, (newVal) => {
   if (newVal) {
@@ -390,6 +397,10 @@ onClickOutside(correctionRef, () => {
 onMounted(async () => {
   console.log("Autodarts Tools: Quick Correction");
 
+  // Load initial scale from config
+  const config = await AutodartsToolsConfig.getValue();
+  correctionScale.value = config?.quickCorrection?.scale ?? 1;
+
   const throwsContainer = await waitForElement("#ad-ext-turn");
   throw1.value = throwsContainer.querySelector("div:nth-of-type(2)");
   throw2.value = throwsContainer.querySelector("div:nth-of-type(3)");
@@ -478,28 +489,87 @@ async function openCorrection(throwElement?: HTMLElement) {
     const rect = throwElement.getBoundingClientRect();
     correctionContainerWidth.value = rect.width;
 
+    const config = await AutodartsToolsConfig.getValue();
+    correctionScale.value = config?.quickCorrection?.scale ?? 1;
+
     const marginSize = 16;
-    const fullWidth = correctionContainerWidth.value + 7 * 16 + marginSize;
+    const baseWidth = correctionContainerWidth.value + 7 * 16; // 7rem = 7 * 16px
+    // Account for scale when calculating actual rendered width
+    const scaledWidth = baseWidth * correctionScale.value;
+    const translateOffset = 3.5 * 16; // 3.5rem translateX offset
+    
+    // With transform: translateX(-3.5rem) scale(scale) and transform-origin: top center
+    // Transform order: translateX first, then scale from center
+    // After translateX(-3.5rem): center moves to (initialX + baseWidth/2 - translateOffset)
+    // After scale: width becomes scaledWidth, center stays at same position
+    // So final left edge = center - scaledWidth/2
+    // = (initialX + baseWidth/2 - translateOffset) - scaledWidth/2
+    // = initialX + (baseWidth - scaledWidth)/2 - translateOffset
 
     let initialX = rect.left;
-
     const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
 
-    const leftBoundary = (3.5 * 16) - marginSize;
-    if (initialX < leftBoundary) {
-      initialX = leftBoundary;
+    // Calculate the actual rendered bounds after transform
+    const centerOffset = (baseWidth - scaledWidth) / 2;
+    const leftEdge = initialX + centerOffset - translateOffset;
+    const rightEdge = leftEdge + scaledWidth;
+
+    // Horizontal positioning - ensure the scaled element stays within viewport
+    if (leftEdge < marginSize) {
+      // Too far left, adjust to keep margin
+      initialX = marginSize - centerOffset + translateOffset;
+    } else if (rightEdge > windowWidth - marginSize) {
+      // Too far right, adjust to keep margin
+      initialX = windowWidth - marginSize - centerOffset - scaledWidth + translateOffset;
     }
 
-    const rightEdge = initialX + fullWidth - (3.5 * 16);
-    if (rightEdge > windowWidth) {
-      initialX = windowWidth - fullWidth + (3.5 * 16);
+    // Final check: if the scaled window is wider than viewport, center it
+    if (scaledWidth > windowWidth - (marginSize * 2)) {
+      const centeredLeftEdge = marginSize;
+      initialX = centeredLeftEdge - centerOffset + translateOffset;
     }
 
-    correctionContainerX.value = initialX;
+    // Ensure X position is never negative
+    correctionContainerX.value = Math.max(0, initialX);
+
+    // Vertical positioning - ensure it doesn't go below viewport
     const height = throwElement.clientHeight;
-    correctionContainerY.value = rect.top + height;
+    let initialY = rect.top + height + 16; // 1rem = 16px spacing
 
-    const config = await AutodartsToolsConfig.getValue();
+    // Estimate the height of the correction window (3 rows + padding)
+    // Approximate: each row ~40px, padding ~24px, gap between rows ~8px
+    const estimatedHeight = (40 * 3) + 24 + (8 * 2); // rows + padding + gaps
+    const scaledHeight = estimatedHeight * correctionScale.value;
+
+    // Check if it would overflow bottom
+    if (initialY + scaledHeight > windowHeight - marginSize) {
+      // Try to position above the throw element instead
+      const topPosition = rect.top - scaledHeight - 16;
+      if (topPosition >= marginSize) {
+        initialY = topPosition;
+      } else {
+        // If it doesn't fit above either, position at top of viewport with margin
+        // But ensure it doesn't exceed max height
+        initialY = marginSize;
+        // If scaled height is too tall, we'll rely on CSS maxHeight to clip it
+      }
+    }
+
+    // Ensure it doesn't go above viewport
+    if (initialY < marginSize) {
+      initialY = marginSize;
+    }
+
+    // Final safety check: ensure the bottom doesn't exceed viewport
+    // (accounting for potential clipping due to maxHeight)
+    const finalBottom = initialY + Math.min(scaledHeight, windowHeight - marginSize * 2);
+    if (finalBottom > windowHeight - marginSize) {
+      initialY = windowHeight - marginSize - Math.min(scaledHeight, windowHeight - marginSize * 2);
+      initialY = Math.max(marginSize, initialY);
+    }
+
+    correctionContainerY.value = initialY;
 
     const throwText = config.enhancedScoringDisplay.enabled
       ? (throwElement.querySelector("p > div > div:last-of-type") as HTMLElement)?.innerText.trim()

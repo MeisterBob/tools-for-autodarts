@@ -156,6 +156,13 @@ async function migrateConfig(currentConfigVersion: number) {
           };
         }
         break;
+      case 18:
+        // Migration from version 18 to version 19
+        config.version = 19;
+        if (config.quickCorrection && config.quickCorrection.scale === undefined) {
+          config.quickCorrection.scale = 1;
+        }
+        break;
     }
 
     await AutodartsToolsConfig.setValue(config);

@@ -134,6 +134,7 @@ export interface IConfig {
   };
   quickCorrection: {
     enabled: boolean;
+    scale: number;
   };
   enhancedScoringDisplay: {
     enabled: boolean;
@@ -317,7 +318,7 @@ export interface IWled {
 export type TBoardStatus = BoardStatus | undefined;
 
 export const defaultConfig: IConfig = {
-  version: 18,
+  version: 19,
   discord: {
     enabled: false,
     manually: false,
@@ -435,6 +436,7 @@ export const defaultConfig: IConfig = {
   },
   quickCorrection: {
     enabled: false,
+    scale: 1,
   },
   enhancedScoringDisplay: {
     enabled: false,
