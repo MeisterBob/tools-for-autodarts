@@ -31,7 +31,7 @@ function hasEventListener(eventName, callback) {
 
 export async function nextPlayerOnTakeOutStuck() {
   try {
-    console.warn("Autodarts Tools: Next player on take out stuck - TEST THIS WITH LIVE BOARD");
+    console.warn("Autodarts Tools: Next player on take out stuck");
 
     const config = await AutodartsToolsConfig.getValue();
 
