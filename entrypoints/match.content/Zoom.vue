@@ -285,6 +285,17 @@ onMounted(async () => {
   // Get user ID on mount
   currentUserId.value = await getUserIdFromToken();
 
+  // Click Live mode button if zoom mode is set to live
+  if (config.value?.zoom?.mode === "live") {
+    try {
+      const liveModeButton = await waitForElement("button[aria-label='Live mode']:not([data-active])", 5000) as HTMLButtonElement;
+      liveModeButton.click();
+      console.log("Autodarts Tools: Clicked Live mode button");
+    } catch (e) {
+      console.warn("Autodarts Tools: Could not find Live mode button", e);
+    }
+  }
+
   await AutodartsToolsBoardImages.setValue({
     images: [],
   });
@@ -391,6 +402,13 @@ async function initCenterZoom() {
     // Create a duplicate of the turn element
     const duplicateElement = turnElement.cloneNode(true) as HTMLElement;
     duplicateElement.id = "autodarts-tools-zoom-center";
+
+    // Hide any buttons inside the cloned element
+    const buttons = duplicateElement.querySelectorAll("button");
+    buttons.forEach((button) => {
+      (button as HTMLElement).style.opacity = "0";
+    });
+
     zoomCenterElement.value = duplicateElement;
 
     // Set opacity of the first div to 0

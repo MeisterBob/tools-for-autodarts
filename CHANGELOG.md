@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [2.2.0] - 2025-12-09
 
 ### Fixed
+- Temporary fix for board images extraction
+  - Disabled websocket board images handler that stopped working after recent update
+  - Implemented DOM-based blob URL extraction as fallback method
+  - Board images are now extracted from SVG elements in the DOM by converting blob URLs to base64 data URLs
+  - Ensures board images continue to work while websocket handler is being fixed
 - Fixed Next Player On Takeout Stuck feature getting triggered twice
   - Ensured status field is always set in websocket board data processing to prevent undefined status values
   - Prevents duplicate triggers when board status updates are received

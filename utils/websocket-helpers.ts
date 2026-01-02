@@ -255,17 +255,62 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
         status: data.status || "",
       });
 
+      // Search DOM for SVG with blob: image URL after 25 0ms delay
+      setTimeout(async () => {
+        const svgs = document.querySelectorAll("svg");
+        let blobUrlFound = false;
+        for (const svg of svgs) {
+          if (blobUrlFound) break;
+          const images = svg.querySelectorAll("image");
+          for (const img of images) {
+            const href = img.getAttribute("href") || img.getAttribute("xlink:href") || img.getAttribute("src");
+            if (href && href.startsWith("blob:")) {
+              try {
+                // Convert blob URL to base64 data URL
+                const response = await fetch(href);
+                const blob = await response.blob();
+                const reader = new FileReader();
+                const base64DataUrl = await new Promise<string>((resolve, reject) => {
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+                  reader.readAsDataURL(blob);
+                });
+
+                const boardImages = await AutodartsToolsBoardImages.getValue();
+                // Check for duplicates before adding
+                if (!boardImages.images.includes(base64DataUrl)) {
+                  boardImages.images.push(base64DataUrl);
+                  while (boardImages.images.length > 6) {
+                    boardImages.images.shift();
+                  }
+                  AutodartsToolsBoardImages.setValue(boardImages);
+                }
+              } catch (error) {
+                console.error("Failed to convert blob URL to base64:", error);
+              }
+              blobUrlFound = true;
+              break; // Only process first blob URL found
+            }
+          }
+        }
+      }, 250);
+
       break;
     }
     case "autodarts.boards.images": {
-      data = data as string;
+      break; // Temp disabled because it's not working as expected since last update
+      data = data as any;
       const boardImages = await AutodartsToolsBoardImages.getValue();
+      const imageUrl = `https://boards.ws.autodarts.io${(data as any).url as string}`;
 
-      boardImages.images.push(data as string);
-      while (boardImages.images.length > 6) {
-        boardImages.images.shift();
+      // Check for duplicates before adding
+      if (!boardImages.images.includes(imageUrl)) {
+        boardImages.images.push(imageUrl);
+        while (boardImages.images.length > 6) {
+          boardImages.images.shift();
+        }
+        AutodartsToolsBoardImages.setValue(boardImages);
       }
-      AutodartsToolsBoardImages.setValue(boardImages);
 
       break;
     }
