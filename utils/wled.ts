@@ -39,7 +39,7 @@ async function processX01Data(
   if (!currentThrow) return null;
 
   const isLastThrow: boolean = gameData.match.turns[0].throws.length >= 3;
-  const throwName: string = currentThrow.segment.name.toLowerCase();
+  let throwName: string = currentThrow.segment.name.toLowerCase();
   const winner: boolean = gameData.match.gameWinner >= 0;
   const winnerMatch: boolean = gameData.match.winner >= 0;
   const busted: boolean = gameData.match.turns[0].busted;
@@ -47,6 +47,8 @@ async function processX01Data(
   const combinedThrows: string = gameData.match.turns[0].throws
     .map((t) => t.segment.name.toLowerCase())
     .join("_");
+
+  if (throwName === "25" && currentThrow.segment.bed.startsWith("Single")) throwName = "s25";
 
   if (winnerMatch && triggerPresentCB("matchshot+" + throwName)) return "matchshot+" + throwName;
   if (winnerMatch && triggerPresentCB("matchshot")) return "matchshot";
