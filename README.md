@@ -335,10 +335,12 @@ Effects can be triggered by various game events using these triggers:
 - **`tournament_ready`**: Triggered when tournament start event is received via websocket
 
 ##### Player-Specific Effects
-- **Player Names**: Use the exact player name as it appears in Autodarts
+- **Player Names**: Use the exact player name as it appears in Autodarts. This is triggered instead of the generic `gameon` effect.
 - **Spaces**: Player names with spaces are supported (e.g., `john doe`)
-- **Underscores**: Alternative format with underscores (e.g., `john_doe`)
+- **Underscores**: Alternative format with whitespaces replaced by underscores (e.g., `john_doe`)
 - **`bot_throw`**: Triggered when a CPU/bot player throws
+- **`gameshot_[player name]`**: player specific gameshot trigger
+- **`matchshot_[player name]`**: player specific matchshot trigger
 
 ##### Board-Specific Effects
 - **Board IDs**: Configure specific board IDs to limit effects to certain boards

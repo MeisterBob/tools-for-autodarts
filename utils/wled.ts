@@ -6,7 +6,23 @@ export async function gameDataProcessor(
   fromWebSocket: boolean = false,
   triggerPresentCB: (trigger: string) => boolean
 ): Promise<string | null> {
+  if (!gameData.match) return null;
+
   let trigger: string | null = null;
+
+  const winner: boolean = gameData.match.gameWinner >= 0;
+  const winnerMatch: boolean = gameData.match.winner >= 0;
+  const currentPlayer = gameData.match.players?.[gameData.match.player];
+  const playerName = currentPlayer?.name;
+  const playerNameLower = playerName.toLowerCase();
+  const playerNameWithUnderscores = playerNameLower.replace(/\s+/g, "_");
+
+  if (winnerMatch && triggerPresentCB("matchshot_" + playerNameLower)) return "gameshot_" + playerNameLower;
+  if (winnerMatch && triggerPresentCB("matchshot_" + playerNameWithUnderscores)) return "gameshot_" + playerNameWithUnderscores;
+  if (winnerMatch && triggerPresentCB("matchshot")) return "matchshot";
+  if (winner && triggerPresentCB("gameshot_" + playerNameLower)) return "gameshot_" + playerNameLower;
+  if (winner && triggerPresentCB("gameshot_" + playerNameWithUnderscores)) return "gameshot_" + playerNameWithUnderscores;
+  if (winner && triggerPresentCB("gameshot")) return "gameshot";
 
   switch (gameData.match!.variant) {
     case "X01":
@@ -59,9 +75,7 @@ async function processX01Data(
   if (throwName === "25" && currentThrow.segment.bed.startsWith("Single")) throwName = "s25";
 
   if (winnerMatch && triggerPresentCB("matchshot+" + throwName)) return "matchshot+" + throwName;
-  if (winnerMatch && triggerPresentCB("matchshot")) return "matchshot";
   if (winner && triggerPresentCB("gameshot+" + throwName)) return "gameshot+" + throwName;
-  if (winner && triggerPresentCB("gameshot")) return "gameshot";
   if (busted && triggerPresentCB("busted")) return "busted";
   if (isLastThrow && triggerPresentCB(combinedThrows)) return combinedThrows;
   if (isLastThrow && triggerPresentCB(points)) return points;
