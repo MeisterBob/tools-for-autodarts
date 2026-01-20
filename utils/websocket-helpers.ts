@@ -255,45 +255,38 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
         status: data.status || "",
       });
 
-      // Search DOM for SVG with blob: image URL after 25 0ms delay
+      // Search DOM for img with blob: src URL after 250ms delay
       setTimeout(async () => {
-        const svgs = document.querySelectorAll("svg");
-        let blobUrlFound = false;
-        for (const svg of svgs) {
-          if (blobUrlFound) break;
-          const images = svg.querySelectorAll("image");
-          for (const img of images) {
-            const href = img.getAttribute("href") || img.getAttribute("xlink:href") || img.getAttribute("src");
-            if (href && href.startsWith("blob:")) {
-              try {
-                // Convert blob URL to base64 data URL
-                const response = await fetch(href);
-                const blob = await response.blob();
-                const reader = new FileReader();
-                const base64DataUrl = await new Promise<string>((resolve, reject) => {
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.onerror = reject;
-                  reader.readAsDataURL(blob);
-                });
+        const images = document.querySelectorAll("img[src^=\"blob:\"]");
+        if (images.length === 0) return;
 
-                const boardImages = await AutodartsToolsBoardImages.getValue();
-                // Check for duplicates before adding
-                if (!boardImages.images.includes(base64DataUrl)) {
-                  boardImages.images.push(base64DataUrl);
-                  while (boardImages.images.length > 6) {
-                    boardImages.images.shift();
-                  }
-                  AutodartsToolsBoardImages.setValue(boardImages);
-                }
-              } catch (error) {
-                console.error("Failed to convert blob URL to base64:", error);
-              }
-              blobUrlFound = true;
-              break; // Only process first blob URL found
+        const img = images[0] as HTMLImageElement;
+        const blobUrl = img.src;
+
+        try {
+          // Convert blob URL to base64 data URL
+          const response = await fetch(blobUrl);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          const base64DataUrl = await new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+
+          const boardImages = await AutodartsToolsBoardImages.getValue();
+          // Check for duplicates before adding
+          if (!boardImages.images.includes(base64DataUrl)) {
+            boardImages.images.push(base64DataUrl);
+            while (boardImages.images.length > 6) {
+              boardImages.images.shift();
             }
+            AutodartsToolsBoardImages.setValue(boardImages);
           }
+        } catch (error) {
+          console.error("Failed to convert blob URL to base64:", error);
         }
-      }, 250);
+      }, 500);
 
       break;
     }

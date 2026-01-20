@@ -23,6 +23,9 @@ let audioUnlocked2 = false;
 let debounceTimer: number | null = null;
 // Debounce delay in milliseconds
 const DEBOUNCE_DELAY = 200;
+// Cooldown tracking for gameshot/matchshot sounds (to prevent multiple triggers from AI referee)
+let lastGameshotTimestamp: number = 0;
+const GAMESHOT_COOLDOWN_MS = 10000; // 10 seconds cooldown
 // Flag to track if we've shown the interaction notification
 let interactionNotificationShown = false;
 // Reference to notification element
@@ -144,6 +147,9 @@ export function soundFxOnRemove() {
     clearTimeout(debounceTimer);
     debounceTimer = null;
   }
+
+  // Reset gameshot cooldown timestamp
+  lastGameshotTimestamp = 0;
 
   // Clean up audio players
   if (audioPlayer) {
@@ -635,6 +641,14 @@ async function processGameData(gameData: IGameData, oldGameData: IGameData, from
   // For non-Cricket variants, use normal sound logic
   if (gameData.match.variant !== "Cricket") {
     if (winner) {
+      // Check cooldown to prevent multiple gameshot/matchshot sounds (e.g., from AI referee)
+      const now = Date.now();
+      if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
+        console.log("Autodarts Tools: Skipping ambient gameshot/matchshot sound due to cooldown");
+        return;
+      }
+      lastGameshotTimestamp = now;
+
       // Check if there's a winner player index and name available
       const winnerPlayerName = gameData.match.players?.[gameData.match.gameWinner]?.name;
 
@@ -757,6 +771,14 @@ async function processGameData(gameData: IGameData, oldGameData: IGameData, from
   } else {
     // For Cricket, handle winner and busted sounds (not the individual throws which are handled above)
     if (winner) {
+      // Check cooldown to prevent multiple gameshot/matchshot sounds (e.g., from AI referee)
+      const now = Date.now();
+      if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
+        console.log("Autodarts Tools: Skipping ambient gameshot/matchshot sound due to cooldown (Cricket)");
+        return;
+      }
+      lastGameshotTimestamp = now;
+
       // Same winner logic as non-Cricket
       const winnerPlayerName = gameData.match.players?.[gameData.match.gameWinner]?.name;
 

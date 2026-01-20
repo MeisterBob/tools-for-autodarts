@@ -279,7 +279,13 @@ const streamingModeButton: Ref<HTMLAnchorElement | null> = ref(null);
 
 const showAvg = computed(() => config.value?.streamingMode.avg);
 
+// Helper to get number of throws in current turn
+const currentThrowCount = computed(() => {
+  return gameData.value?.match?.turns?.[0]?.throws?.length || 0;
+});
+
 // Computed property to check for possible checkout
+// Returns the checkout guide adjusted for darts already thrown
 const possibleCheckout = computed(() => {
   // Check if checkout feature is enabled in config
   if (!config.value?.streamingMode.checkout) return null;
@@ -289,12 +295,29 @@ const possibleCheckout = computed(() => {
   const currentPlayerIndex = gameData.value.match.player;
   const currentScore = gameData.value.match.gameScores[currentPlayerIndex];
 
-  // Return the checkout guide segments if available and player has a valid score
-  if (currentScore > 0) {
-    return gameData.value.match.state.checkoutGuide;
+  // Return null if no valid score
+  if (currentScore <= 0) return null;
+
+  const checkoutGuide = gameData.value.match.state.checkoutGuide;
+  const throwsAlreadyMade = currentThrowCount.value;
+
+  // Build an array where each position matches the dart position (0, 1, 2)
+  // For darts already thrown, the position is null
+  // For remaining darts, map from the checkoutGuide
+  const result: (typeof checkoutGuide[0] | null)[] = [ null, null, null ];
+
+  for (let i = 0; i < 3; i++) {
+    if (i < throwsAlreadyMade) {
+      // This dart has already been thrown
+      result[i] = null;
+    } else {
+      // Map from checkout guide: index in guide = dart position - throws already made
+      const guideIndex = i - throwsAlreadyMade;
+      result[i] = checkoutGuide[guideIndex] || null;
+    }
   }
 
-  return null;
+  return result;
 });
 
 // Custom drag handlers
