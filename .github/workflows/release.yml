@@ -76,8 +76,8 @@ jobs:
     permissions:
       contents: write # Allows this job to create releases
     
-    # Use macos-15 for better Xcode support with fully pre-installed platform components
-    runs-on: macos-15
+    # Use macos-14 which has Xcode 15.x pre-installed with iOS platforms ready to use
+    runs-on: macos-14
     timeout-minutes: 30
     needs: draft_release
 
@@ -114,9 +114,8 @@ jobs:
       - name: Install Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          # Use Xcode 16.1 - stable version that works reliably on macos-15 runners
-          # Later versions have ibtool issues with platform components not being fully available
-          xcode-version: '16.1'
+          # Use Xcode 15.4 - stable version with iOS platform pre-installed on macos-14 runners
+          xcode-version: '15.4'
       
       - name: Setup Xcode Environment
         run: |
@@ -140,14 +139,11 @@ jobs:
             echo "ERROR: iOS SDK not found!"
             exit 1
           fi
-          echo ""
-          echo "iOS Simulator Runtimes:"
-          xcrun simctl runtime list 2>/dev/null || echo "No simulator runtimes listed"
       
       - name: Build and Archive iOS App
         run: |
           cd "Tools for Autodarts"
-          # Build the archive with verbose output for debugging
+          # Build the archive - no destination flag needed for archive with -sdk iphoneos
           set -o pipefail
           xcodebuild \
             -project "Tools for Autodarts.xcodeproj" \
@@ -155,7 +151,6 @@ jobs:
             -configuration Release \
             -archivePath "./build/ToolsForAutodarts.xcarchive" \
             -sdk iphoneos \
-            -destination "generic/platform=iOS" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
