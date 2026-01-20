@@ -147,6 +147,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            ENABLE_ON_DEMAND_RESOURCES=NO \
             archive \
             2>&1 | tee xcodebuild.log || {
               echo "Build failed. Showing last 100 lines of build log:"
