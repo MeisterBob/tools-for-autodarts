@@ -76,7 +76,8 @@ jobs:
     permissions:
       contents: write # Allows this job to create releases
     
-    runs-on: macos-latest
+    # Use macos-15 for better Xcode support with fully pre-installed platform components
+    runs-on: macos-15
     timeout-minutes: 30
     needs: draft_release
 
@@ -113,9 +114,17 @@ jobs:
       - name: Install Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          # Use Xcode 16.2 - stable version with all platform components pre-installed on GitHub runners
-          # Xcode 16.3 has ibtool issues with iOS 18.4 platform not being fully available
-          xcode-version: '16.2'
+          # Use Xcode 16.1 - stable version that works reliably on macos-15 runners
+          # Later versions have ibtool issues with platform components not being fully available
+          xcode-version: '16.1'
+      
+      - name: Setup Xcode Environment
+        run: |
+          # Run first launch to install additional required components
+          sudo xcodebuild -runFirstLaunch
+          
+          # Accept Xcode license
+          sudo xcodebuild -license accept
       
       - name: Verify iOS Platform Components
         run: |
@@ -131,6 +140,9 @@ jobs:
             echo "ERROR: iOS SDK not found!"
             exit 1
           fi
+          echo ""
+          echo "iOS Simulator Runtimes:"
+          xcrun simctl runtime list 2>/dev/null || echo "No simulator runtimes listed"
       
       - name: Build and Archive iOS App
         run: |
