@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.3] - 2026-01-21
+
+### Added
+- Added WLED Preset mode that fetches presets directly from your WLED controller
+  - Presets are displayed in a dropdown for easy selection
+  - No need to manually construct URLs for preset activation
+- Added WLED JSON API mode for advanced lighting control
+  - Allows POST requests with custom JSON body to WLED's `/json` endpoint
+  - Enables complex effect configurations not possible with simple URL triggers
+- Added WLED support for additional game modes: ATC, RTW, Shanghai, and Bob's 27
+  - New `target[1-20,25,bull]` triggers for the current target field
+  - Automatically detects the current target based on game variant and round
+- Added new WLED triggers for enhanced game event control:
+  - `bulloff` trigger for bull-off rounds
+  - `gameshot_[player_name]` and `matchshot_[player_name]` for player-specific winning effects
+  - `board_stopped`, `calibration_started`, `calibration_finished` for board status events
+- Added "Trigger effects only once" option for WLED
+  - Prevents duplicate effect triggers when the same field is hit multiple times in a row
+  - Configurable per user preference
+
+### Fixed
+- Fixed WLED `s25` trigger incorrectly firing as `25`
+  - Single 25 hits now correctly trigger `s25` instead of generic `25`
+
 ## [2.2.2] - 2026-01-20
 
 ### Fixed
