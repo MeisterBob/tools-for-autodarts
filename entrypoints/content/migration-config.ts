@@ -1,3 +1,4 @@
+import { WledType } from "#imports";
 import { AutodartsToolsConfig, defaultConfig } from "@/utils/storage";
 
 export async function migrationConfig() {
@@ -162,6 +163,16 @@ async function migrateConfig(currentConfigVersion: number) {
         if (config.quickCorrection && config.quickCorrection.scale === undefined) {
           config.quickCorrection.scale = 1;
         }
+        break;
+      case 19:
+        // Migration from version 19 to version 20
+        config.version = 20;
+        config.wledFx.onlyOnce = true;
+        config.wledFx.effects.forEach((effect) => {
+          effect.type = WledType.URL;
+          effect.preset = '';
+          effect.json_api = '';
+        });
         break;
     }
 

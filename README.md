@@ -298,6 +298,11 @@ WLED is a popular open-source firmware for controlling addressable LED strips (W
 #### Supported Triggers
 Effects can be triggered by various game events using these triggers:
 
+##### Board Status (only during a game)
+- **board_stopped**: when the board gets stopped
+- **calibration_Started**: when calibration is started
+- **calibration_finished**: when calibration has finished
+
 ##### Game Events
 - **`gameon`**: At the start of each player's turn (default fallback effect)
 - **`takeout`**: When takeout is in progress
@@ -330,10 +335,12 @@ Effects can be triggered by various game events using these triggers:
 - **`tournament_ready`**: Triggered when tournament start event is received via websocket
 
 ##### Player-Specific Effects
-- **Player Names**: Use the exact player name as it appears in Autodarts
+- **Player Names**: Use the exact player name as it appears in Autodarts. This is triggered instead of the generic `gameon` effect.
 - **Spaces**: Player names with spaces are supported (e.g., `john doe`)
-- **Underscores**: Alternative format with underscores (e.g., `john_doe`)
+- **Underscores**: Alternative format with whitespaces replaced by underscores (e.g., `john_doe`)
 - **`bot_throw`**: Triggered when a CPU/bot player throws
+- **`gameshot_[player name]`**: player specific gameshot trigger
+- **`matchshot_[player name]`**: player specific matchshot trigger
 
 ##### Board-Specific Effects
 - **Board IDs**: Configure specific board IDs to limit effects to certain boards
@@ -347,24 +354,36 @@ Effects can be triggered by various game events using these triggers:
 
 #### Technical Implementation
 - **HTTP Requests**: Effects trigger HTTP GET requests to the specified URLs
-- **HTTPS Only**: All URLs must use HTTPS protocol for security
+- **JSON API**: Effects trigger HTTP POST requests to the specified URLs with the specified JSON body
+- **HTTPS Only**: All URLs must use HTTPS protocol for security (HTTP may work in the local network)
 - **Debouncing**: Game events are debounced to prevent rapid-fire triggers
 - **Error Handling**: Failed requests are silently ignored to prevent interrupting gameplay
 
 #### Example WLED URLs
 ```
-https://wled-device.local/win/PL=1    # Play preset 1
-https://wled-device.local/win/A=128   # Set brightness to 128
-https://wled-device.local/win/FX=54   # Set effect to 54
-https://wled-device.local/win/R=255&G=0&B=0  # Set color to red
+http://wled-device.local/win/PL=1    # Play preset 1
+http://wled-device.local/win/A=128   # Set brightness to 128
+http://wled-device.local/win/FX=54   # Set effect to 54
+http://wled-device.local/win/R=255&G=0&B=0  # Set color to red
 ```
+
+#### Example WLED JSON API call
+
+WLED API Endpoint: http://wled-device.local/json
+```json
+{"on":true,"bri":255,"transition":1,"bs":0,"mainseg":0,"seg":[{"id":0,"start":0,"stop":135,"grp":1,"spc":0,"of":0,"on":true,"frz":false,"bri":255,"cct":127,"set":0,"lc":1,"n":"1_0","col":[[0,255,0],[255,0,0],[0,0,255]],"fx":179,"sx":128,"ix":128,"pal":11,"c1":128,"c2":128,"c3":16,"sel":true,"rev":false,"mi":false,"o1":false,"o2":false,"o3":false,"si":0,"m12":0,"bm":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0},{"stop":0}]}
+```
+
+The current state of the WLED leds can be fetched at http://wled-device.local/json/state. Refer to
+https://kno.wled.ge/interfaces/json-api/ for further informations about the json API.
+
 
 #### CSV Import Format
 Import multiple effects at once using this format:
 ```csv
-Effect Name;https://wled-device.local/win/PL=1;gameon
-180 Effect;https://wled-device.local/win/PL=2;180
-Takeout;https://wled-device.local/win/PL=3;takeout;busted
+Effect Name;http://wled-device.local/win/PL=1;gameon
+180 Effect;http://wled-device.local/win/PL=2;180
+Takeout;http://wled-device.local/win/PL=3;takeout;busted
 ```
 
 #### Board Filtering
@@ -374,8 +393,9 @@ Takeout;https://wled-device.local/win/PL=3;takeout;busted
 
 #### Game Mode Support
 - **X01 Games**: Full support for all triggers and point combinations
+- **ATC, RTW, Shanghai, Bob's 27**: `target[1-20,25,bull]` for the current target 
 - **Cricket**: Basic support with plans for expanded cricket-specific triggers
-- **Bull-off**: Automatically disabled during bull-off rounds
+- **Bull-off**: `bulloff` trigger on bull-off rounds
 
 #### Best Practices
 1. **Test Effects**: Use the play button in settings to test effects before games

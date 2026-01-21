@@ -7,6 +7,7 @@ import { AutodartsToolsTournamentData, type ITournament } from "@/utils/tourname
 import { AutodartsToolsConfig, type IConfig, type IWled } from "@/utils/storage";
 import { triggerPatterns } from "@/utils/helpers";
 import { gameDataProcessor } from "@/utils/wled";
+import { WledType } from "#imports";
 
 let gameDataWatcherUnwatch: any;
 let lobbyDataWatcherUnwatch: any;
@@ -19,14 +20,35 @@ let debounceTimer: number | null = null;
 const DEBOUNCE_DELAY = 200;
 
 async function checkStatus(boardData: IBoard) {
+  const boardEvent: string | undefined = boardData.event;
   const boardStatus: string | undefined = boardData.status;
+
+  console.log(`Autodarts Tools: WLED: Board: event '${boardEvent}', status '${boardStatus}'`);
 
   if (
     boardStatus === "Takeout in progress"
     && isTriggerPresent("takeout")
-    && (config.wledFx.boardIds.length === 0
-      || (config.wledFx.boardIds.length > 0 && config.wledFx.boardIds.includes(currentBoardId)))
+    && (config!.wledFx.boardIds.length === 0
+      || (config!.wledFx.boardIds.length > 0 && config!.wledFx.boardIds.includes(currentBoardId)))
   ) { setEffectByTrigger("takeout"); }
+  else if (
+    boardStatus === "Stopped"
+    && isTriggerPresent("board_stopped")
+    && (config!.wledFx.boardIds.length === 0
+      || (config!.wledFx.boardIds.length > 0 && config!.wledFx.boardIds.includes(currentBoardId)))
+  ) { setEffectByTrigger("board_stopped"); }
+  else if (
+    boardEvent === "Calibration started"
+    && isTriggerPresent("calibration_started")
+    && (config!.wledFx.boardIds.length === 0
+      || (config!.wledFx.boardIds.length > 0 && config!.wledFx.boardIds.includes(currentBoardId)))
+  ) { setEffectByTrigger("calibration_started"); }
+  else if (
+    boardEvent === "Calibration finished"
+    && isTriggerPresent("calibration_finished")
+    && (config!.wledFx.boardIds.length === 0
+      || (config!.wledFx.boardIds.length > 0 && config!.wledFx.boardIds.includes(currentBoardId)))
+  ) { setEffectByTrigger("calibration_finished"); }
 }
 
 export async function wledFx() {
@@ -35,16 +57,12 @@ export async function wledFx() {
   try {
     config = await AutodartsToolsConfig.getValue();
     const gameData = await AutodartsToolsGameData.getValue();
-    console.log(
-      `Autodarts Tools: WLED: Config loaded, ${
-        config?.wledFx?.effects?.length || 0
-      } effects available`,
-    );
+    console.log(`Autodarts Tools: WLED: Config loaded, ${config.wledFx?.effects?.length || 0} effects available`);
 
     if (!gameDataWatcherUnwatch) {
       gameDataWatcherUnwatch = AutodartsToolsGameData.watch(
         (gameData: IGameData, oldGameData: IGameData) => {
-          if (!config?.wledFx?.enabled) return;
+          if (!config.wledFx?.enabled) return;
 
           // Debounce the processGameData call
           if (debounceTimer) {
@@ -71,7 +89,7 @@ export async function wledFx() {
     if (!lobbyDataWatcherUnwatch) {
       lobbyDataWatcherUnwatch = AutodartsToolsLobbyData.watch(
         async (_lobbyData: ILobbies | undefined, _oldLobbyData: ILobbies | undefined) => {
-          if (!_lobbyData || !_oldLobbyData || !config?.wledFx?.enabled) return;
+          if (!_lobbyData || !_oldLobbyData || !config.wledFx?.enabled) return;
           const currentURL = window.location.href;
           if (!currentURL.includes("lobbies")) return;
 
@@ -101,9 +119,9 @@ export async function wledFx() {
     if (!tournamentDataWatcherUnwatch) {
       tournamentDataWatcherUnwatch = AutodartsToolsTournamentData.watch(
         async (tournamentData: ITournament | undefined, oldTournamentData: ITournament | undefined) => {
-          if (!tournamentData || !config?.wledFx?.enabled) return;
+          if (!tournamentData || !config.wledFx?.enabled) return;
 
-          // Check if tournament event is "start" and trigger the ambient_tournament_ready effect
+          // Check if tournament event is "start" and trigger the tournament_ready effect
           if (tournamentData.event === "start") {
             console.log("Autodarts Tools: WLED: Tournament start event detected, triggering tournament_ready effect");
             setEffectByTrigger("tournament_ready");
@@ -153,7 +171,10 @@ async function processGameData(
 
   const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
   if (editMode) return;
-  if (gameData.match.variant === "Bull-off") return;
+  if (gameData.match.variant === "Bull-off" && isTriggerPresent("bulloff")) {
+    setEffectByTrigger("bulloff");
+    return;
+  }
 
   // gameon is the default effect to play when no other event happened
   let nextEffect: string | IWled = "gameon";
@@ -240,10 +261,13 @@ function isTriggerPresent(trigger: string): boolean {
 /**
  * Set an effect based on the trigger
  */
-export function setEffectByTrigger(trigger: string): void {
-  if (!config?.wledFx?.effects || !config.wledFx.effects.length) {
-    console.log("Autodarts Tools: WLED: No effects configured");
-    return;
+export async function setEffectByTrigger(trigger: string, wait: boolean = false): Promise<void> {
+  if (!config) {
+    config = await AutodartsToolsConfig.getValue();
+    if (!config.wledFx.effects.length) {
+      console.log("Autodarts Tools: WLED: No effects configured");
+      return;
+    }
   }
 
   // Find all effects that match the trigger
@@ -282,41 +306,73 @@ export function setEffectByTrigger(trigger: string): void {
   const nextEffect = matchingEffects[randomIndex];
 
   console.log(`Autodarts Tools: WLED: Found matching effect ${nextEffect.name}`);
-  setEffect(nextEffect);
+  await setEffect(nextEffect, wait);
 }
 
 let currentEffect: IWled;
-export function setEffect(effect: IWled) {
-  if (effect !== currentEffect && effect.url) {
-    currentEffect = effect;
-    console.info("Autodarts Tools: WLED: fetching", effect.url);
+export async function setEffect(effect: IWled, wait: boolean = false) {
+  if (!config)
+    config = await AutodartsToolsConfig.getValue();
 
-    // Use setTimeout to ensure the fetch doesn't block or interfere with page state
-    // This makes it truly fire-and-forget
-    setTimeout(() => {
-      const controller = new AbortController();
+  if (config.wledFx.onlyOnce && effect === currentEffect) {
+    console.info("Autodarts Tools: WLED: didn't fetch", effect.url, "because the effect is already active");
+    return;
+  }
+  if (!effect.url) {
+    console.info("Autodarts Tools: WLED: effect", effect.name, "doesn't have an url");
+    return;
+  }
+  currentEffect = effect;
+  console.info("Autodarts Tools: WLED: fetching", effect.url);
+
+  const controller = new AbortController();
+  const data = {
+    mode: "no-cors",
+    method: effect.type === WledType.URL ? "GET" : "POST",
+    signal: controller.signal,
+    cache: "no-cache",
+    credentials: "omit",
+    ...(effect.type === WledType.API && {
+      headers: { 'Content-Type': 'application/json' },
+      body: effect.json_api
+    }),
+  };
+  let url = effect.url;
+  if (effect.type === WledType.PRESET) {
+    url = (effect.url.startsWith('http') ? '' : 'http://')
+      + effect.url
+      + (effect.url.endsWith('/') ? '' : '/')
+      + 'win/PL=' + effect.preset;
+  }
+  if (wait) {
+    try {
+      // Use setTimeout to ensure the fetch doesn't block or interfere with page state
+      // This makes it truly fire-and-forget
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-      fetch(effect.url, {
-        mode: "no-cors",
-        method: "GET",
-        signal: controller.signal,
-        cache: "no-cache",
-        credentials: "omit",
-      })
+      await fetch(url, data);
+      clearTimeout(timeoutId);
+    } catch (e) {
+      const error = e as Error;
+      if (error.name !== "AbortError") {
+        console.log("Autodarts Tools: WLED: Request failed (non-critical)", error);
+      }
+    }
+  } else {
+    setTimeout(() => {
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      fetch(url, data)
         .then(() => {
           clearTimeout(timeoutId);
           // Success - no need to do anything with no-cors response
         })
         .catch((e) => {
+          const error = e as Error;
           clearTimeout(timeoutId);
           // Silently ignore errors to prevent interfering with game state
-          if (e.name !== "AbortError") {
-            console.log("Autodarts Tools: WLED: Request failed (non-critical)", e);
+          if (error.name !== "AbortError") {
+            console.log("Autodarts Tools: WLED: Request failed (non-critical)", error);
           }
         });
     }, 0);
-  } else {
-    console.info("Autodarts Tools: WLED: didn't fetch", effect.url, "because the effect is already active");
   }
 }

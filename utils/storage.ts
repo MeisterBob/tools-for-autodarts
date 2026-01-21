@@ -151,6 +151,7 @@ export interface IConfig {
   };
   wledFx: {
     enabled: boolean;
+    onlyOnce: boolean;
     boardIds: string[];
     effects: IWled[];
   };
@@ -308,17 +309,26 @@ export interface ILobbyStatus {
   maxPlayers?: number;
 }
 
+export enum WledType {
+  PRESET = "PRESET",
+  URL = "URL",
+  API = "API",
+}
+
 export interface IWled {
   name: string;
+  type: WledType;
   url: string;
+  preset: string;
+  json_api: string;
   enabled: boolean;
-  triggers: string[];
+  triggers: string|string[];
 }
 
 export type TBoardStatus = BoardStatus | undefined;
 
 export const defaultConfig: IConfig = {
-  version: 19,
+  version: 20,
   discord: {
     enabled: false,
     manually: false,
@@ -658,50 +668,36 @@ export const defaultConfig: IConfig = {
   },
   wledFx: {
     enabled: false,
+    onlyOnce: true,
     boardIds: [],
     effects: [
       {
         name: "gameon",
-        url: "https://wled.fritz.box/win/PL=10",
+        type: WledType.URL,
+        url: "http://wled-device.local/win/PL=10",
+        preset: "",
+        json_api: "",
         enabled: true,
         triggers: [ "gameon" ],
       },
       {
         name: "takeout",
-        url: "https://wled.fritz.box/win/PL=24",
+        type: WledType.URL,
+        url: "wled-device.local",
+        preset: "4",
+        json_api: "",
         enabled: true,
         triggers: [ "takeout" ],
       },
       {
         name: "gameshot",
-        url: "https://wled.fritz.box/win/PL=9",
+        type: WledType.URL,
+        url: "192.168.0.69",
+        preset: "6",
+        json_api: "",
         enabled: true,
         triggers: [ "gameshot" ],
-      },
-      {
-        name: "matchshot",
-        url: "https://wled.fritz.box/win/PL=3",
-        enabled: true,
-        triggers: [ "matchshot" ],
-      },
-      {
-        name: "180",
-        url: "https://wled.fritz.box/win/PL=12",
-        enabled: true,
-        triggers: [ "180" ],
-      },
-      {
-        name: "busted",
-        url: "https://wled.fritz.box/win/PL=20",
-        enabled: true,
-        triggers: [ "busted" ],
-      },
-      {
-        name: "tournament_ready",
-        url: "https://wled.fritz.box/win/PL=15",
-        enabled: true,
-        triggers: [ "tournament_ready" ],
-      },
+      }
     ],
   },
 };

@@ -62,6 +62,16 @@
               </div>
             </div>
 
+            <div>
+              <div class="mt-2 flex items-center gap-2">
+                <div class="flex items-center gap-2">
+                  <span>trigger Effects only once</span>
+                </div>
+                <AppToggle @update:model-value="config.wledFx.onlyOnce = !config.wledFx.onlyOnce"
+                  v-model="config.wledFx.onlyOnce" />
+              </div>
+            </div>
+
             <div class="mt-2 flex items-center gap-2 text-sm">
               <span class="icon-[pixelarticons--drag-and-drop] text-white/60" />
               <p>Drag and drop effects to change their order</p>
@@ -137,7 +147,7 @@
                     class="truncate border-b border-white/30 pb-1 font-mono text-xxs"
                     :title="effect.url"
                   >
-                    {{ effect.url }}
+                    {{ effect.type === WledType.PRESET ? `${effect.url} preset ${effect.preset}` : effect.url }}
                   </div>
                   <div class="mt-1 truncate font-mono uppercase">
                     {{
@@ -176,7 +186,7 @@
             <AppTextarea
               id="csv-data"
               v-model="csvData"
-              placeholder="[name];[url];[trigger][;[trigger]...]"
+              :placeholder="csvImportPlaceholder"
               monospace
               :rows="10"
               :autosize="false"
@@ -223,25 +233,79 @@
         </div>
 
         <div>
-          <label for="effect-data" class="mb-1 block text-sm font-medium text-white">Effect
+          <label for="effect-type" class="mb-1 block text-sm font-medium text-white">
+            Effect Type
+          </label>
+          <div class="relative">
+            <AppRadioGroup v-model="newEffect.type" class="grid max-w-sm grid-cols-3" :options="[
+              { label: 'PRESET', value: WledType.PRESET },
+              { label: 'URL', value: WledType.URL },
+              { label: 'JSON API', value: WledType.API },
+            ]" />
+          </div>
+        </div>
+
+        <div v-if="newEffect.type === WledType.PRESET">
+          <label for="effect-url" class="mb-1 block text-sm font-medium text-white">WLED
+            domain/IP</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-3 flex items-center text-white/60">
+              <span class="icon-[pixelarticons--link]" />
+            </span>
+            <AppInput id="effect-url" v-model="newEffect.url" type="text" class="pl-9"
+              placeholder="wled-device.local | 192.168.0.69" />
+          </div>
+          <div v-if="urlError" class="mt-1 text-sm text-red-500">
+            {{ urlError }}
+          </div>
+          <div v-else-if="!newEffect.url.startsWith('https://')" class="mt-1 text-sm text-amber-400">
+            Warning: Using HTTP URLs might cause mixed content issues.
+          </div>
+          <label class="mb-1 block text-sm font-medium text-white">WLED Preset</label>
+          <AppDropdown :options="availablePresetsOptions" v-model="newEffect.preset" />
+          <div v-if="presetError" class="mt-1 text-sm text-red-500">
+            {{ presetError }}
+          </div>
+        </div>
+        <div v-if="newEffect.type === WledType.URL">
+          <label for="effect-url" class="mb-1 block text-sm font-medium text-white">Effect
             URL</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-3 flex items-center text-white/60">
               <span class="icon-[pixelarticons--link]" />
             </span>
-            <AppInput
-              id="effect-data"
-              v-model="newEffect.url"
-              type="text"
-              placeholder="https://.."
-              class="pl-9"
-            />
+            <AppInput id="effect-url" v-model="newEffect.url" type="text"
+              placeholder="http://wled-device.local/win/PL=1" class="pl-9" />
           </div>
           <div v-if="urlError" class="mt-1 text-sm text-red-500">
             {{ urlError }}
           </div>
           <div v-else-if="newEffect.url.startsWith('http://')" class="mt-1 text-sm text-amber-400">
             Warning: Using HTTP URLs might cause mixed content issues.
+          </div>
+        </div>
+        <div v-if="newEffect.type === WledType.API">
+          <label for="effect-url" class="mb-1 block text-sm font-medium text-white">WLED API
+            Endpoint</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-3 flex items-center text-white/60">
+              <span class="icon-[pixelarticons--link]" />
+            </span>
+            <AppInput id="effect-url" v-model="newEffect.url" type="text"
+              placeholder="http://wled-device.local/json" class="pl-9" />
+          </div>
+          <div v-if="urlError" class="mt-1 text-sm text-red-500">
+            {{ urlError }}
+          </div>
+          <div v-else-if="newEffect.url.startsWith('http://')" class="mt-1 text-sm text-amber-400">
+            Warning: Using HTTP URLs might cause mixed content issues.
+          </div>
+          <label for="wled-json-api" class="mb-1 block text-sm font-medium text-white">WLED
+            JSON</label>
+          <div class="relative">
+            <AppTextarea id="wled-json-api" v-model="newEffect.json_api" placeholder="{}" monospace
+              :rows="6" :autosize="false" />
+            <div v-if="jsonError" class="mt-1 text-sm text-red-500">{{ jsonError }}</div>
           </div>
         </div>
 
@@ -267,7 +331,7 @@
             :placeholder="triggerPlaceholder"
             monospace
             :rows="6"
-            :max-rows="10"
+            :autosize="false"
           />
         </div>
       </div>
@@ -349,12 +413,15 @@ import AppModal from "../AppModal.vue";
 import AppTextarea from "../AppTextarea.vue";
 import AppInput from "../AppInput.vue";
 import AppNotification from "../AppNotification.vue";
+import AppRadioGroup from "../AppRadioGroup.vue";
+import AppDropdown from "../AppDropDown.vue";
 
 import { useNotification } from "@/composables/useNotification";
 import { AutodartsToolsConfig, type IConfig, type IWled } from "@/utils/storage";
 import { setEffect } from "@/entrypoints/match.content/wled";
+import { WledType } from "#imports";
 
-const emit = defineEmits([ "toggle", "settingChange" ]);
+const emit = defineEmits(["toggle", "settingChange"]);
 useStorage("adt:active-settings", "wled-fx");
 
 const triggerPlaceholder = "gameon\ntakeout\nbusted\ngameshot\nmatchshot\n...";
@@ -364,14 +431,23 @@ const config = ref<IConfig>();
 const imageUrl = browser.runtime.getURL("/images/ad_wled_logo.png");
 const showEffectModal = ref(false);
 const isEditMode = ref(false);
-const newEffect = ref({
-  name: "",
-  url: "",
-  trigger: "",
+const newEffect = ref<IWled>({
+  enabled: true,
+  name: '',
+  type: WledType.PRESET,
+  preset: "0",
+  url: '',
+  json_api: '',
+  triggers: '',
 });
 const editingIndex = ref<number | null>(null);
 const urlError = ref("");
+const presetError = ref("");
+const jsonError = ref("");
 const allowAdd = ref(false);
+const availablePresetsOptions = ref<[{ value: string, label: string }]>([
+  { value: "0", label: 'not yet loaded' }
+]);
 
 // Sortable related refs
 const effectsContainer = ref<HTMLElement | null>(null);
@@ -382,6 +458,10 @@ let sortableInstance: Sortable | null = null;
 const showImportCSVModal = ref(false);
 const csvData = ref("");
 const csvError = ref("");
+const csvImportPlaceholder = ref(
+  "[name];URL;[url];[trigger][;[trigger]...]\n" +
+  "[name];API;[api_url];[json];[trigger][;[trigger]...]"
+);
 
 // Delete all modal
 const showDeleteAllModal = ref(false);
@@ -390,9 +470,9 @@ const { notification, showNotification, hideNotification } = useNotification();
 
 // Computed property for trigger text handling
 const wledTrigger = computed({
-  get: () => newEffect.value.trigger,
+  get: () => newEffect.value.triggers,
   set: (val: string) => {
-    newEffect.value.trigger = val.toLowerCase();
+    newEffect.value.triggers = val.toLowerCase();
   },
 });
 
@@ -414,12 +494,18 @@ onMounted(async () => {
   allowAdd.value = true;
 });
 
+watch(() => newEffect.value.url, async () => {
+  if (newEffect.value.type === WledType.PRESET) {
+    await fetchPresets();
+  }
+});
+
 watch(config, async (_, oldValue) => {
   if (!oldValue) return;
 
   await AutodartsToolsConfig.setValue(toRaw(config.value!));
   emit("settingChange");
-  console.log("WLED FX setting changed");
+  console.log("Autodarts Tools: WLED: setting changed");
 }, { deep: true });
 
 // Initialize Sortable.js
@@ -477,6 +563,13 @@ function closeImportCSVModal() {
   csvError.value = "";
 }
 
+function stringToWledType(value: string): WledType | null {
+  if (Object.values(WledType).includes(value as WledType)) {
+    return value as WledType;
+  }
+  return null;
+}
+
 // Parse CSV content into an array of objects
 function parseCSV(csv: string): IWled[] {
   // Split the CSV by newlines and filter out empty lines
@@ -497,8 +590,16 @@ function parseCSV(csv: string): IWled[] {
     }
 
     const name = values.shift()!;
+    const type: WledType | null = stringToWledType(values.shift()!);
     const url = values.shift()!;
+    const preset: string = type === WledType.PRESET ? values.shift()! : "0";
+    const json_api = type === WledType.API ? values.shift()! : '';
     const triggers: string[] = values;
+
+    if (type === null) {
+      csvError.value = `Line "${line}": Invalid type. Choose from 'URL' or 'API'`;
+      return [];
+    }
 
     if (!url.startsWith("https://") && !url.startsWith("http://")) {
       csvError.value = `Line "${line}": URL must start with http:// or https://`;
@@ -506,10 +607,13 @@ function parseCSV(csv: string): IWled[] {
     }
 
     results.push({
-      name,
-      url,
+      name: name,
+      type: type,
+      url: url,
+      preset: preset,
+      json_api: json_api,
       enabled: true,
-      triggers,
+      triggers: triggers,
     });
   }
 
@@ -532,8 +636,35 @@ async function processCSV() {
   showNotification(`${csvEntries.length} effects imported`, "success");
 }
 
+async function fetchPresets() {
+  console.log("Autodarts Tools: WLED: fetchPresets");
+  try {
+    const presetUrl = (newEffect.value.url.startsWith('http') ? '' : 'http://')
+      + newEffect.value.url
+      + (newEffect.value.url.endsWith('/') ? '' :'/')
+      + 'presets.json';
+    console.log("Autodarts Tools: WLED: loading presets from", presetUrl);
+    availablePresetsOptions.value = [{ value: newEffect.value.preset, label: 'failed to fetch presets' }];
+    window.fetch(presetUrl)
+      .then((resp) => resp.json())
+      .then((data: Record<string, { n: string }>) => {
+        if (data && typeof data === 'object') {
+          availablePresetsOptions.value = [{ value: "0", label: 'Select an option' }];
+          Object.entries(data).forEach(([id, preset]) => {
+            if (id === '0' || !('n' in preset) || preset.n === undefined) return;
+            availablePresetsOptions.value.push({ value: id, label: `[${id}] ${preset.n}` });
+          });
+        } else {
+          console.error('Autodarts Tools: WLED: Invalid response format. Expected an object.', data);
+        }
+      });
+  } catch (error) {
+    console.error('Autodarts Tools: WLED: Error fetching presets:', error);
+  }
+}
+
 function openAddEffectModal() {
-  newEffect.value = { name: "", url: "", trigger: "" };
+  newEffect.value = { name: "", type: WledType.PRESET, url: "", preset: "0", json_api: "", triggers: "", enabled: true };
   isEditMode.value = false;
   editingIndex.value = null;
   urlError.value = "";
@@ -541,7 +672,7 @@ function openAddEffectModal() {
 }
 
 function closeEffectModal() {
-  newEffect.value = { name: "", url: "", trigger: "" };
+  newEffect.value = { name: "", type: WledType.PRESET, url: "", preset: "0", json_api: "", triggers: "", enabled: true };
   showEffectModal.value = false;
   editingIndex.value = null;
   urlError.value = "";
@@ -553,8 +684,12 @@ function editEffect(index: number) {
   // Set up base form values
   newEffect.value = {
     name: effect.name || "",
+    type: effect.type,
     url: effect.url || "",
-    trigger: Array.isArray(effect.triggers) ? effect.triggers.join("\n") : "",
+    preset: effect.preset || "0",
+    json_api: effect.json_api || "",
+    triggers: Array.isArray(effect.triggers) ? effect.triggers.join("\n") : "",
+    enabled: true
   };
 
   isEditMode.value = true;
@@ -570,34 +705,57 @@ async function saveEffect() {
   }
 
   // Check if we have triggers
-  if (!newEffect.value.trigger.trim()) {
+  if (typeof newEffect.value.triggers === 'string' && !newEffect.value.triggers.trim()) {
     showNotification("Please provide at least one trigger", "error");
     return;
   }
 
-  // Check if URL is valid
-  if (!newEffect.value.url.trim()) {
-    showNotification("Please provide a URL", "error");
-    return;
-  }
-
-  if (!newEffect.value.url.startsWith("https://") && !newEffect.value.url.startsWith("http://")) {
-    urlError.value = "URL must start with http:// or https://";
-    return;
+  if (newEffect.value.type == WledType.URL) {
+    // Check if URL is valid
+    if (!newEffect.value.url.trim()) {
+      showNotification("Please provide a URL", "error");
+      return;
+    }
+    if (!newEffect.value.url.startsWith("https://") && !newEffect.value.url.startsWith("http://")) {
+      urlError.value = "URL must start with http:// or https://";
+      return;
+    }
+  } else if (newEffect.value.type == WledType.PRESET) {
+    if (newEffect.value.preset === "0") {
+      presetError.value = "please select a preset";
+      return;
+    }
+  } else if (newEffect.value.type == WledType.JSON) {
+    // Check if json is valid
+    try {
+      JSON.parse(newEffect.value.json_api)
+    } catch (e) {
+      showNotification("JSON is invalid", "error")
+      jsonError.value = "that's not valid JSON";
+      return;
+    }
   }
 
   urlError.value = "";
+  presetError.value = "";
+  jsonError.value = "";
 
   // Convert trigger to array of triggers (split by newline and filter empty lines)
-  const triggers = newEffect.value.trigger
-    .split("\n")
-    .map(line => line.trim().toLowerCase())
-    .filter(line => line.length > 0);
+  const triggers =
+    typeof newEffect.value.triggers === 'string'
+      ? newEffect.value.triggers
+        .split("\n")
+        .map((line) => line.trim().toLowerCase())
+        .filter((line) => line.length > 0)
+      : [];
 
   // Create effect object
   const effect: IWled = {
     name: newEffect.value.name.trim() || "",
+    type: newEffect.value.type,
     url: newEffect.value.url.trim(),
+    preset: newEffect.value.preset,
+    json_api: newEffect.value.json_api.trim(),
     enabled: true,
     triggers,
   };
