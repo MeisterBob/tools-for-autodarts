@@ -1,4 +1,4 @@
-# :dart: Tools for Autodarts v2.2.6 Released! :dart:
+# :dart: Tools for Autodarts v2.2.7 Released! :dart:
 
 ### :bug: Bug Fixes
 - **Authentication**: Completely reworked how the extension captures your login token — it now intercepts the Keycloak token endpoint directly, making auth reliable again across all features

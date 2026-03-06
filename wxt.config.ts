@@ -24,7 +24,6 @@ export default defineConfig({
   },
   manifest: {
     host_permissions: [
-      "*://login.autodarts.io/*",
       "*://play.autodarts.io/*",
       "*://api.autodarts.io/*",
       "*://darts-downloads.peschi.org/*",
@@ -34,7 +33,6 @@ export default defineConfig({
     ],
     permissions: [
       "storage",
-      "cookies",
       // "background",
     ],
     background: {

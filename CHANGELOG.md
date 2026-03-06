@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.2.6] - 2026-03-06
+## [2.2.7] - 2026-03-06
 
 ### Fixed
 - Fixed authentication token capture: completely rewrote `auth-cookie.ts` to intercept the Keycloak OIDC token endpoint response via `fetch` override instead of reading a cookie value
