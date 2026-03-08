@@ -155,6 +155,9 @@ export interface IConfig {
     boardIds: string[];
     effects: IWled[];
   };
+  gotcha: {
+    enabled: boolean;
+  };
 }
 
 export interface ISound {
@@ -328,7 +331,7 @@ export interface IWled {
 export type TBoardStatus = BoardStatus | undefined;
 
 export const defaultConfig: IConfig = {
-  version: 20,
+  version: 21,
   discord: {
     enabled: false,
     manually: false,
@@ -699,6 +702,9 @@ export const defaultConfig: IConfig = {
         triggers: [ "gameshot" ],
       }
     ],
+  },
+  gotcha: {
+    enabled: false,
   },
 };
 

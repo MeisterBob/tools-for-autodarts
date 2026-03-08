@@ -174,6 +174,14 @@ async function migrateConfig(currentConfigVersion: number) {
           effect.json_api = '';
         });
         break;
+      case 20:
+        // Migration from version 20 to version 21
+        config.version = 21;
+        if (!config.gotcha) {
+          config.gotcha = {
+            enabled: false,
+          };
+        }
     }
 
     await AutodartsToolsConfig.setValue(config);
