@@ -40,7 +40,7 @@
               <span class="icon-[pixelarticons--arrow-left]" />
             </AppButton>
             <h1 class="text-xl font-bold lg:text-2xl xl:text-3xl">
-              Autodarts Tools
+              Autodarts Tools {{ packageConfig.version }}
             </h1>
           </div>
           <div class="mt-2 grid grid-cols-2 items-center gap-2 sm:mt-0 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
@@ -268,6 +268,8 @@ import Zoom from "./Settings/Zoom.vue";
 import QuickCorrection from "./Settings/QuickCorrection.vue";
 import EnhancedScoringDisplay from "./Settings/EnhancedScoringDisplay.vue";
 import InstantReplay from "./Settings/InstantReplay.vue";
+
+import packageConfig from "../package.json";
 
 import type { IConfig, ISound } from "@/utils/storage";
 
