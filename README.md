@@ -432,7 +432,7 @@ Takeout;http://wled-device.local/win/PL=3;takeout;busted
 #### Game Mode Support
 - **X01 Games**: Full support for all triggers and point combinations
 - **ATC, RTW, Shanghai, Bob's 27**: `target[1-20,25,bull]` for the current target 
-- **Cricket**: Basic support with plans for expanded cricket-specific triggers
+- **Cricket**: (**for advanced users**) Calls a URL with the game state encoded. The user needs to provide a server that translates this into colorful LEDs
 - **Bull-off**: `bulloff` trigger on bull-off rounds
 
 #### Best Practices

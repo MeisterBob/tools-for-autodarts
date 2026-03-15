@@ -186,10 +186,6 @@ async function processGameData(
 
   const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
   if (editMode) return;
-  if (gameData.match.variant === "Bull-off" && isTriggerPresent("bulloff")) {
-    setEffectByTrigger("bulloff");
-    return;
-  }
 
   // gameon is the default effect to play when no other event happened
   let nextEffect: string | IWled = "gameon";
@@ -226,7 +222,7 @@ async function processGameData(
     }
   }
 
-  const effect: string | null = await gameDataProcessor(gameData, oldGameData, fromWebSocket, isTriggerPresent);
+  const effect: string | null = await gameDataProcessor(config, gameData, oldGameData, fromWebSocket, isTriggerPresent);
   if (effect) {
     // found effect for match variant
     nextEffect = effect;

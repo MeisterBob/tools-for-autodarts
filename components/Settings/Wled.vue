@@ -119,7 +119,7 @@
                   />
                 </div>
 
-                <!-- Effect name (centered) -->
+                <!-- Effect name -->
                 <div
                   v-if="effect.name"
                   class="absolute left-[7.5rem] top-3.5 z-20 max-w-28 truncate"
@@ -169,6 +169,76 @@
                       <span class="icon-[pixelarticons--trash] text-sm" />
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+            <!-- Advanced Settings -->
+            <div class="mt-2 rounded-md bg-white/10">
+              <button
+                @click="showAdvanced = !showAdvanced"
+                class="flex w-full items-center justify-between px-3 py-2 text-sm text-white/70 hover:text-white"
+              >
+                <span>Advanced Settings</span>
+                <span :class="showAdvanced ? 'icon-[pixelarticons--chevron-up]' : 'icon-[pixelarticons--chevron-down]'" />
+              </button>
+              <div v-if="showAdvanced" class="px-3 py-3 space-y-3">
+                <!-- Cricket feature description -->
+                <div class="rounded-md bg-white/5 p-3 text-sm text-white/70">
+                  Tools for Autodarts cannot directly set the board state from Cricket/Tactics as a
+                  WLED effect. Instead, Tools calls a URL in which the state is encoded. Some other
+                  tool is required to convert this into LED colors. The URL called begins with the
+                  prefix set below. Either <span class="font-mono">/cricket</span> or
+                  <span class="font-mono">/tactics</span> and the status of each field is
+                  appended. The status is either the number of hits on the field,
+                  <span class="font-mono">o</span> when the field is open for the current player
+                  or <span class="font-mono">c</span> if all players have 3+ hits on that field. A
+                  sample Python Script is available at https://github.com/creazy231/tools-for-autodarts/blob/main/scripts/wled.py
+                </div>
+                <div class="grid grid-cols-[auto_1fr] items-center gap-4">
+                  <label for="cricket-prefix" class="text-sm text-white/70">Cricket URL prefix</label>
+                  <AppInput id="cricket-prefix" v-model="config.wledFx.cricketPrefix" placeholder="http://192.168.0.220:5000" monospace />
+                </div>
+                <!-- Cricket Test Interface -->
+                <div class="rounded-md border border-white/20 p-3 space-y-3">
+                  <div class="text-sm font-medium text-white/80">Test Cricket/Tactics URL</div>
+
+                  <div class="flex items-center gap-3">
+                    <span class="text-sm text-white/70">Mode:</span>
+                    <AppRadioGroup v-model="cricketTestMode" class="grid max-w-xs grid-cols-2" :options="[
+                      { label: 'Cricket', value: 'cricket' },
+                      { label: 'Tactics', value: 'tactics' },
+                    ]" />
+                  </div>
+
+                  <div class="space-y-2">
+                    <div
+                      v-for="(field, idx) in (cricketTestMode === 'cricket' ? cricketFields : tacticsFields)"
+                      :key="field"
+                      class="grid grid-cols-[3rem_1fr] items-center gap-2"
+                    >
+                      <span class="text-sm font-mono text-white/70">{{ field }}</span>
+                      <div class="flex gap-1">
+                        <button
+                          v-for="state in ['0', '1', '2', 'o', 'c']"
+                          :key="state"
+                          @click="cricketTestStates[idx] = state"
+                          class="px-2 py-1 text-xs font-mono rounded border transition-colors"
+                          :class="cricketTestStates[idx] === state
+                            ? 'border-white/60 bg-white/20 text-white'
+                            : 'border-white/20 bg-transparent text-white/50 hover:bg-white/10'"
+                        >{{ state }}</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded bg-black/40 p-2 font-mono text-xs text-white/60 break-all">
+                    {{ cricketTestUrl }}
+                  </div>
+
+                  <AppButton @click="testCricketUrl" size="sm" class="!py-1 text-xs" auto>
+                    <span class="icon-[pixelarticons--play] mr-1" />
+                    Test
+                  </AppButton>
                 </div>
               </div>
             </div>
@@ -445,6 +515,25 @@ const urlError = ref("");
 const presetError = ref("");
 const jsonError = ref("");
 const allowAdd = ref(false);
+const showAdvanced = ref(false);
+
+// Cricket test interface
+const cricketFields = ['15', '16', '17', '18', '19', '20', 'Bull'];
+const tacticsFields = ['10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 'Bull'];
+const cricketTestMode = ref<'cricket' | 'tactics'>('cricket');
+const cricketTestStates = ref<string[]>(Array(7).fill('0'));
+watch(cricketTestMode, (mode) => {
+  cricketTestStates.value = Array(mode === 'cricket' ? cricketFields.length : tacticsFields.length).fill('0');
+});
+const cricketTestUrl = computed(() => {
+  const prefix = config.value?.wledFx.cricketPrefix || 'http://192.168.0.220:5000';
+  return `${prefix}/${cricketTestMode.value}/${cricketTestStates.value.join('/')}`;
+});
+function testCricketUrl() {
+  fetch(cricketTestUrl.value, { signal: AbortSignal.timeout(2000) }).catch(() => {});
+}
+
+// preset Options
 const availablePresetsOptions = ref<[{ value: string, label: string }]>([
   { value: "0", label: 'not yet loaded' }
 ]);

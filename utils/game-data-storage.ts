@@ -1,8 +1,10 @@
 import type { IMatch } from "./websocket-helpers";
 
 export enum GameMode {
+  BULL_OFF = "Bull-off",
   X01 = "X01",
-  CRICKET_TACTICS = "Cricket / Tactics",
+  CRICKET = "Cricket",
+  TACTICS = "Tactics",
   BERMUDA = "Bermuda",
   SHANGHAI = "Shanghai",
   GOTCHA = "Gotcha",
