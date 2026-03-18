@@ -231,10 +231,12 @@ jobs:
           sudo xcodebuild -license accept
           xcodebuild -version
 
-      - name: Install Apple Certificate and Provisioning Profiles
+      - name: Install Apple Certificates and Provisioning Profiles
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_INSTALLER_CERTIFICATE_BASE64: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_BASE64 }}
+          APPLE_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE_APP_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_APP_BASE64 }}
           APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64 }}
           APPLE_PROVISIONING_PROFILE_MACOS_APP_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_MACOS_APP_BASE64 }}
@@ -242,6 +244,7 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          INSTALLER_CERT_PATH=$RUNNER_TEMP/installer_certificate.p12
           PP_APP_PATH=$RUNNER_TEMP/app_profile.mobileprovision
           PP_EXT_PATH=$RUNNER_TEMP/ext_profile.mobileprovision
           PP_MAC_APP_PATH=$RUNNER_TEMP/mac_app_profile.provisionprofile
@@ -250,6 +253,7 @@ jobs:
 
           # Decode from base64
           echo -n "$APPLE_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$APPLE_INSTALLER_CERTIFICATE_BASE64" | base64 --decode -o $INSTALLER_CERT_PATH
           echo -n "$APPLE_PROVISIONING_PROFILE_APP_BASE64" | base64 --decode -o $PP_APP_PATH
           echo -n "$APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64" | base64 --decode -o $PP_EXT_PATH
           echo -n "$APPLE_PROVISIONING_PROFILE_MACOS_APP_BASE64" | base64 --decode -o $PP_MAC_APP_PATH
@@ -260,8 +264,9 @@ jobs:
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-          # Import certificate to keychain
+          # Import certificates to keychain
           security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security import $INSTALLER_CERT_PATH -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH login.keychain-db
 
