@@ -68,11 +68,13 @@ async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
   console.log(`\n── ${platformLabel} ──────────────────────────────────────`);
 
   // 1. Wait for build to be processed
+  // Map platform to preReleaseVersion platform filter
+  const buildPlatform = platform === "IOS" ? "IOS" : "MAC_OS";
   console.log(`⏳ Waiting for ${platformLabel} build...`);
   let build: any = null;
   for (let attempt = 0; attempt < 60; attempt++) {
     const buildsRes = await api(
-      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&sort=-uploadedDate&limit=5`,
+      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&filter[preReleaseVersion.platform]=${buildPlatform}&sort=-uploadedDate&limit=5`,
     );
     for (const b of buildsRes.data) {
       if (b.attributes?.processingState === "VALID") {
