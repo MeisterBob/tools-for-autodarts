@@ -29,3 +29,10 @@ web-ext.config.ts
 !.env.example
 
 git2md
+
+# Apple signing secrets
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.certSigningRequest

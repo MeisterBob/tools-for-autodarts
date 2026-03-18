@@ -202,6 +202,149 @@ jobs:
           files: |
             .output/autodarts-tools-ios.ipa
 
+  submit_to_app_store:
+    permissions:
+      contents: read
+
+    runs-on: macos-14
+    timeout-minutes: 30
+    needs: [draft_release, build_ios_app]
+    # Only submit from main branch (not prereleases)
+    if: needs.draft_release.outputs.prerelease == 'false'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: yarn install --no-frozen-lockfile
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Build Safari Extension
+        run: |
+          yarn build -b safari
+          bun run scripts/safari.ts
+
+      - name: Update Xcode Project Version
+        run: bun run scripts/update-xcode-version.ts
+
+      - name: Install Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Setup Xcode Environment
+        run: |
+          sudo xcodebuild -runFirstLaunch
+          sudo xcodebuild -license accept
+
+      - name: Install Apple Certificate and Provisioning Profile
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE_APP_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_APP_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_APP_PATH=$RUNNER_TEMP/app_profile.mobileprovision
+          PP_EXT_PATH=$RUNNER_TEMP/ext_profile.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Decode from base64
+          echo -n "$APPLE_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$APPLE_PROVISIONING_PROFILE_APP_BASE64" | base64 --decode -o $PP_APP_PATH
+          echo -n "$APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64" | base64 --decode -o $PP_EXT_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Install provisioning profiles
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_APP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp $PP_EXT_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Build and Archive for App Store
+        run: |
+          cd "Tools for Autodarts"
+          set -o pipefail
+          xcodebuild \
+            -project "Tools for Autodarts.xcodeproj" \
+            -scheme "Tools for Autodarts (iOS)" \
+            -configuration Release \
+            -archivePath "./build/AppStore.xcarchive" \
+            -sdk iphoneos \
+            -allowProvisioningUpdates \
+            archive \
+            2>&1 | tee xcodebuild-appstore.log || {
+              echo "Build failed. Last 100 lines:"
+              tail -100 xcodebuild-appstore.log
+              exit 1
+            }
+
+      - name: Create ExportOptions.plist
+        run: |
+          cat > "Tools for Autodarts/ExportOptions.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Write App Store Connect API Key
+        run: |
+          echo -n "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode -o $RUNNER_TEMP/AuthKey.p8
+
+      - name: Export and Upload to App Store Connect
+        run: |
+          cd "Tools for Autodarts"
+          xcodebuild -exportArchive \
+            -archivePath "./build/AppStore.xcarchive" \
+            -exportOptionsPlist "ExportOptions.plist" \
+            -exportPath "./build/AppStoreExport" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+      - name: Submit for App Store Review
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+        run: bun run scripts/submit-to-app-store.ts
+
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
   check_version_change:
     permissions:
       contents: read
