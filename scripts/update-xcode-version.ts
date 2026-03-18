@@ -16,12 +16,15 @@ let pbxprojContent = fs.readFileSync(pbxprojPath, "utf-8");
 const marketingVersionRegex = /MARKETING_VERSION = [^;]+;/g;
 pbxprojContent = pbxprojContent.replace(marketingVersionRegex, `MARKETING_VERSION = ${version};`);
 
-// Update all CURRENT_PROJECT_VERSION entries to match the version
+// Update all CURRENT_PROJECT_VERSION entries to a numeric build number
+// Convert semver to integer: 2.2.7 → 20207 (major*10000 + minor*100 + patch)
+const [major, minor, patch] = version.split(".").map(Number);
+const buildNumber = major * 10000 + minor * 100 + patch;
 const currentProjectVersionRegex = /CURRENT_PROJECT_VERSION = [^;]+;/g;
-pbxprojContent = pbxprojContent.replace(currentProjectVersionRegex, `CURRENT_PROJECT_VERSION = ${version};`);
+pbxprojContent = pbxprojContent.replace(currentProjectVersionRegex, `CURRENT_PROJECT_VERSION = ${buildNumber};`);
 
 // Write back the updated content
 fs.writeFileSync(pbxprojPath, pbxprojContent);
 
 console.log(`✅ Updated Xcode project MARKETING_VERSION to ${version}`);
-console.log(`✅ Updated Xcode project CURRENT_PROJECT_VERSION to ${version}`);
+console.log(`✅ Updated Xcode project CURRENT_PROJECT_VERSION to ${buildNumber}`);
