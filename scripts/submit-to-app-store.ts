@@ -136,23 +136,30 @@ async function main() {
   });
   console.log("   Build selected\n");
 
-  // 5. Create a submission
+  // 5. Create a submission (skip if already submitted)
   console.log("📤 Submitting for review...");
-  await api("/appStoreVersionSubmissions", {
-    method: "POST",
-    body: JSON.stringify({
-      data: {
-        type: "appStoreVersionSubmissions",
-        relationships: {
-          appStoreVersion: {
-            data: { type: "appStoreVersions", id: appStoreVersion.id },
+  try {
+    await api("/appStoreVersionSubmissions", {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "appStoreVersionSubmissions",
+          relationships: {
+            appStoreVersion: {
+              data: { type: "appStoreVersions", id: appStoreVersion.id },
+            },
           },
         },
-      },
-    }),
-  });
-
-  console.log(`✅ Successfully submitted version ${version} for App Store Review!`);
+      }),
+    });
+    console.log(`✅ Successfully submitted version ${version} for App Store Review!`);
+  } catch (err: any) {
+    if (err.message?.includes("403")) {
+      console.log(`ℹ️  Version ${version} is already submitted for review.`);
+    } else {
+      throw err;
+    }
+  }
   console.log("   You can track the review status at https://appstoreconnect.apple.com");
 }
 
