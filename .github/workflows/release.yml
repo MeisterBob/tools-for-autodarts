@@ -289,6 +289,48 @@ jobs:
           echo "APP_PROFILE_UUID=${APP_PROFILE_UUID}" >> $GITHUB_ENV
           echo "EXT_PROFILE_UUID=${EXT_PROFILE_UUID}" >> $GITHUB_ENV
 
+      - name: Configure code signing for App Store
+        run: |
+          cd "Tools for Autodarts"
+          python3 << 'PYEOF'
+          import os
+
+          pbxproj_path = "Tools for Autodarts.xcodeproj/project.pbxproj"
+          app_uuid = os.environ["APP_PROFILE_UUID"]
+          ext_uuid = os.environ["EXT_PROFILE_UUID"]
+
+          with open(pbxproj_path, 'r') as f:
+              content = f.read()
+
+          # Switch all targets to manual signing
+          content = content.replace(
+              'CODE_SIGN_STYLE = Automatic',
+              'CODE_SIGN_STYLE = Manual'
+          )
+
+          # Use distribution identity
+          content = content.replace(
+              'CODE_SIGN_IDENTITY = "Apple Development"',
+              'CODE_SIGN_IDENTITY = "Apple Distribution"'
+          )
+
+          # Set provisioning profile per target by bundle ID
+          # Extension must be replaced first (longer match prevents partial overlap)
+          content = content.replace(
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools.extension";',
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools.extension";\n\t\t\t\tPROVISIONING_PROFILE = "' + ext_uuid + '";'
+          )
+          content = content.replace(
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools";',
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools";\n\t\t\t\tPROVISIONING_PROFILE = "' + app_uuid + '";'
+          )
+
+          with open(pbxproj_path, 'w') as f:
+              f.write(content)
+
+          print("Code signing configured for App Store distribution")
+          PYEOF
+
       - name: Build and Archive for App Store
         run: |
           cd "Tools for Autodarts"
@@ -299,10 +341,6 @@ jobs:
             -configuration Release \
             -archivePath "./build/AppStore.xcarchive" \
             -sdk iphoneos \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            "PROVISIONING_PROFILE[sdk=iphoneos*]=${APP_PROFILE_UUID}" \
             archive \
             2>&1 | tee xcodebuild-appstore.log || {
               echo "Build failed. Last 100 lines:"
