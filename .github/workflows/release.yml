@@ -274,8 +274,14 @@ jobs:
 
           # Import certificate to keychain
           security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH login.keychain-db
+
+          # Verify certificate was imported correctly
+          echo "=== Certificates in keychain ==="
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+          echo "=== Keychain search list ==="
+          security list-keychain -d user
 
           # Install provisioning profiles with their UUID as filename
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
