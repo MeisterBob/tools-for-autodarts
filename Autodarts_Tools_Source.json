@@ -22,10 +22,10 @@
       "versions": [
         {
           "version": "2.2.7",
-          "date": "2026-03-18T14:19:13.760Z",
+          "date": "2026-03-18T14:27:42.283Z",
           "localizedDescription": null,
           "downloadURL": "https://github.com/creazy231/tools-for-autodarts/releases/latest/download/autodarts-tools-ios.ipa",
-          "size": 31288625,
+          "size": 31288624,
           "buildVersion": "2.2.7",
           "minOSVersion": "15.6"
         },
