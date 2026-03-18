@@ -386,8 +386,9 @@ jobs:
       - name: Configure code signing for macOS
         run: |
           cd "Tools for Autodarts"
-          # Restore original pbxproj and re-patch for macOS
+          # Restore original pbxproj, re-apply version update, then patch for macOS
           git checkout -- "Tools for Autodarts.xcodeproj/project.pbxproj"
+          cd .. && bun run scripts/update-xcode-version.ts && cd "Tools for Autodarts"
           python3 << 'PYEOF'
           import os
 
@@ -426,6 +427,7 @@ jobs:
             -archivePath "./build/AppStoreMac.xcarchive" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            ARCHS="arm64 x86_64" \
             archive \
             2>&1 | tee xcodebuild-macos.log || {
               echo "macOS build failed. Last 100 lines:"
