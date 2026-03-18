@@ -121,11 +121,8 @@ jobs:
           sudo xcodebuild -runFirstLaunch
           sudo xcodebuild -license accept
 
-          # Install iOS platform if not available
-          if ! xcodebuild -showsdks | grep -q "iphoneos"; then
-            echo "iOS SDK not found, downloading platform..."
-            xcodebuild -downloadPlatform iOS
-          fi
+          # Download iOS platform (required on macos-15 runners with Xcode 16)
+          xcodebuild -downloadPlatform iOS
 
           echo "Xcode version:"
           xcodebuild -version
@@ -240,11 +237,8 @@ jobs:
           sudo xcodebuild -runFirstLaunch
           sudo xcodebuild -license accept
 
-          # Install iOS platform if not available
-          if ! xcodebuild -showsdks | grep -q "iphoneos"; then
-            echo "iOS SDK not found, downloading platform..."
-            xcodebuild -downloadPlatform iOS
-          fi
+          # Download iOS platform (required on macos-15 runners with Xcode 16)
+          xcodebuild -downloadPlatform iOS
 
       - name: Install Apple Certificate and Provisioning Profile
         env:
