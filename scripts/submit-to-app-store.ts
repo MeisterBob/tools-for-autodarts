@@ -62,39 +62,37 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ── Main Flow ────────────────────────────────────────────────────────
-async function main() {
-  console.log(`🚀 Submitting version ${version} to App Store Review...\n`);
+// ── Submit a single platform ─────────────────────────────────────────
+async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
+  const platformLabel = platform === "IOS" ? "iOS" : "macOS";
+  console.log(`\n── ${platformLabel} ──────────────────────────────────────`);
 
-  // 1. Find the app
-  console.log("📱 Finding app...");
-  const appsRes = await api(`/apps?filter[bundleId]=${APP_BUNDLE_ID}`);
-  const app = appsRes.data[0];
-  if (!app) throw new Error(`App not found with bundle ID: ${APP_BUNDLE_ID}`);
-  const appId = app.id;
-  console.log(`   Found: ${app.attributes.name} (${appId})\n`);
-
-  // 2. Wait for build to be processed
-  console.log("⏳ Waiting for build to be processed...");
+  // 1. Wait for build to be processed
+  console.log(`⏳ Waiting for ${platformLabel} build...`);
   let build: any = null;
   for (let attempt = 0; attempt < 60; attempt++) {
     const buildsRes = await api(
-      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&sort=-uploadedDate&limit=1`,
+      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&sort=-uploadedDate&limit=5`,
     );
-    if (buildsRes.data.length > 0) {
-      build = buildsRes.data[0];
-      break;
+    for (const b of buildsRes.data) {
+      if (b.attributes?.processingState === "VALID") {
+        build = b;
+        break;
+      }
     }
+    if (build) break;
     console.log(`   Build not ready yet, retrying in 30s... (attempt ${attempt + 1}/60)`);
     await sleep(30_000);
-    // Refresh token every 10 minutes
     if (attempt % 20 === 19) token = generateJWT();
   }
-  if (!build) throw new Error("Build not found or not processed after 30 minutes");
-  console.log(`   Build ready: ${build.attributes.version} (${build.id})\n`);
+  if (!build) {
+    console.log(`⚠️  ${platformLabel} build not found, skipping.`);
+    return;
+  }
+  console.log(`   Build ready: ${build.attributes.version} (${build.id})`);
 
-  // 3. Create or find App Store version
-  console.log("📦 Creating App Store version...");
+  // 2. Create or find App Store version for this platform
+  console.log(`📦 Creating ${platformLabel} App Store version...`);
   let appStoreVersion: any;
   try {
     const createVersionRes = await api("/appStoreVersions", {
@@ -103,7 +101,7 @@ async function main() {
         data: {
           type: "appStoreVersions",
           attributes: {
-            platform: "IOS",
+            platform,
             versionString: version,
             releaseType: "AFTER_APPROVAL",
           },
@@ -114,19 +112,21 @@ async function main() {
       }),
     });
     appStoreVersion = createVersionRes.data;
-    console.log(`   Created version ${version}\n`);
+    console.log(`   Created version ${version}`);
   } catch {
-    // Version might already exist, try to find it
     console.log("   Version may already exist, looking for it...");
     const versionsRes = await api(
-      `/apps/${appId}/appStoreVersions?filter[versionString]=${version}&filter[platform]=IOS`,
+      `/apps/${appId}/appStoreVersions?filter[versionString]=${version}&filter[platform]=${platform}`,
     );
     appStoreVersion = versionsRes.data[0];
-    if (!appStoreVersion) throw new Error(`Could not create or find version ${version}`);
-    console.log(`   Found existing version ${version}\n`);
+    if (!appStoreVersion) {
+      console.log(`⚠️  Could not create or find ${platformLabel} version ${version}, skipping.`);
+      return;
+    }
+    console.log(`   Found existing version ${version}`);
   }
 
-  // 4. Select the build for this version
+  // 3. Select the build
   console.log("🔗 Selecting build for version...");
   await api(`/appStoreVersions/${appStoreVersion.id}/relationships/build`, {
     method: "PATCH",
@@ -134,9 +134,9 @@ async function main() {
       data: { type: "builds", id: build.id },
     }),
   });
-  console.log("   Build selected\n");
+  console.log("   Build selected");
 
-  // 5. Create a submission (skip if already submitted)
+  // 4. Submit for review
   console.log("📤 Submitting for review...");
   try {
     await api("/appStoreVersionSubmissions", {
@@ -152,15 +152,33 @@ async function main() {
         },
       }),
     });
-    console.log(`✅ Successfully submitted version ${version} for App Store Review!`);
+    console.log(`✅ ${platformLabel} version ${version} submitted for review!`);
   } catch (err: any) {
     if (err.message?.includes("403")) {
-      console.log(`ℹ️  Version ${version} is already submitted for review.`);
+      console.log(`ℹ️  ${platformLabel} version ${version} is already submitted for review.`);
     } else {
       throw err;
     }
   }
-  console.log("   You can track the review status at https://appstoreconnect.apple.com");
+}
+
+// ── Main Flow ────────────────────────────────────────────────────────
+async function main() {
+  console.log(`🚀 Submitting version ${version} to App Store Review...\n`);
+
+  // Find the app
+  console.log("📱 Finding app...");
+  const appsRes = await api(`/apps?filter[bundleId]=${APP_BUNDLE_ID}`);
+  const app = appsRes.data[0];
+  if (!app) throw new Error(`App not found with bundle ID: ${APP_BUNDLE_ID}`);
+  const appId = app.id;
+  console.log(`   Found: ${app.attributes.name} (${appId})`);
+
+  // Submit both platforms
+  await submitPlatform(appId, "IOS");
+  await submitPlatform(appId, "MAC_OS");
+
+  console.log("\n🎉 Done! Track review status at https://appstoreconnect.apple.com");
 }
 
 main().catch((err) => {

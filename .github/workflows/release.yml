@@ -231,24 +231,29 @@ jobs:
           sudo xcodebuild -license accept
           xcodebuild -version
 
-      - name: Install Apple Certificate and Provisioning Profile
+      - name: Install Apple Certificate and Provisioning Profiles
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE_APP_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_APP_BASE64 }}
           APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_MACOS_APP_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_MACOS_APP_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_MACOS_EXTENSION_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_MACOS_EXTENSION_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Create variables
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           PP_APP_PATH=$RUNNER_TEMP/app_profile.mobileprovision
           PP_EXT_PATH=$RUNNER_TEMP/ext_profile.mobileprovision
+          PP_MAC_APP_PATH=$RUNNER_TEMP/mac_app_profile.provisionprofile
+          PP_MAC_EXT_PATH=$RUNNER_TEMP/mac_ext_profile.provisionprofile
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
           # Decode from base64
           echo -n "$APPLE_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
           echo -n "$APPLE_PROVISIONING_PROFILE_APP_BASE64" | base64 --decode -o $PP_APP_PATH
           echo -n "$APPLE_PROVISIONING_PROFILE_EXTENSION_BASE64" | base64 --decode -o $PP_EXT_PATH
+          echo -n "$APPLE_PROVISIONING_PROFILE_MACOS_APP_BASE64" | base64 --decode -o $PP_MAC_APP_PATH
+          echo -n "$APPLE_PROVISIONING_PROFILE_MACOS_EXTENSION_BASE64" | base64 --decode -o $PP_MAC_EXT_PATH
 
           # Create temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
@@ -260,25 +265,33 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH login.keychain-db
 
-          # Verify certificate was imported correctly
           echo "=== Certificates in keychain ==="
           security find-identity -v -p codesigning $KEYCHAIN_PATH
-          echo "=== Keychain search list ==="
-          security list-keychain -d user
 
-          # Install provisioning profiles with their UUID as filename
+          # Install provisioning profiles
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
 
           APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PP_APP_PATH))
           EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PP_EXT_PATH))
+          MAC_APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PP_MAC_APP_PATH))
+          MAC_EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PP_MAC_EXT_PATH))
 
           cp $PP_APP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${APP_PROFILE_UUID}.mobileprovision
           cp $PP_EXT_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${EXT_PROFILE_UUID}.mobileprovision
+          cp $PP_MAC_APP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${MAC_APP_PROFILE_UUID}.provisionprofile
+          cp $PP_MAC_EXT_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${MAC_EXT_PROFILE_UUID}.provisionprofile
 
           echo "APP_PROFILE_UUID=${APP_PROFILE_UUID}" >> $GITHUB_ENV
           echo "EXT_PROFILE_UUID=${EXT_PROFILE_UUID}" >> $GITHUB_ENV
+          echo "MAC_APP_PROFILE_UUID=${MAC_APP_PROFILE_UUID}" >> $GITHUB_ENV
+          echo "MAC_EXT_PROFILE_UUID=${MAC_EXT_PROFILE_UUID}" >> $GITHUB_ENV
 
-      - name: Configure code signing for App Store
+      - name: Write App Store Connect API Key
+        run: |
+          echo -n "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode -o $RUNNER_TEMP/AuthKey.p8
+
+      # ── iOS Build ────────────────────────────────────────────────────
+      - name: Configure code signing for iOS
         run: |
           cd "Tools for Autodarts"
           python3 << 'PYEOF'
@@ -291,20 +304,9 @@ jobs:
           with open(pbxproj_path, 'r') as f:
               content = f.read()
 
-          # Switch all targets to manual signing
-          content = content.replace(
-              'CODE_SIGN_STYLE = Automatic',
-              'CODE_SIGN_STYLE = Manual'
-          )
+          content = content.replace('CODE_SIGN_STYLE = Automatic', 'CODE_SIGN_STYLE = Manual')
+          content = content.replace('CODE_SIGN_IDENTITY = "Apple Development"', 'CODE_SIGN_IDENTITY = "Apple Distribution"')
 
-          # Use distribution identity
-          content = content.replace(
-              'CODE_SIGN_IDENTITY = "Apple Development"',
-              'CODE_SIGN_IDENTITY = "Apple Distribution"'
-          )
-
-          # Set provisioning profile per target by bundle ID
-          # Extension must be replaced first (longer match prevents partial overlap)
           content = content.replace(
               'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools.extension";',
               'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools.extension";\n\t\t\t\tPROVISIONING_PROFILE = "' + ext_uuid + '";'
@@ -316,11 +318,10 @@ jobs:
 
           with open(pbxproj_path, 'w') as f:
               f.write(content)
-
-          print("Code signing configured for App Store distribution")
+          print("iOS code signing configured")
           PYEOF
 
-      - name: Build and Archive for App Store
+      - name: Build and Archive iOS for App Store
         run: |
           cd "Tools for Autodarts"
           set -o pipefail
@@ -333,15 +334,16 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             archive \
-            2>&1 | tee xcodebuild-appstore.log || {
-              echo "Build failed. Last 100 lines:"
-              tail -100 xcodebuild-appstore.log
+            2>&1 | tee xcodebuild-ios.log || {
+              echo "iOS build failed. Last 100 lines:"
+              tail -100 xcodebuild-ios.log
               exit 1
             }
 
-      - name: Create ExportOptions.plist
+      - name: Export and Upload iOS to App Store Connect
         run: |
-          cat > "Tools for Autodarts/ExportOptions.plist" << EOF
+          cd "Tools for Autodarts"
+          cat > ExportOptions-iOS.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -366,23 +368,104 @@ jobs:
           </dict>
           </plist>
           EOF
-
-      - name: Write App Store Connect API Key
-        run: |
-          echo -n "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode -o $RUNNER_TEMP/AuthKey.p8
-
-      - name: Export and Upload to App Store Connect
-        run: |
-          cd "Tools for Autodarts"
           xcodebuild -exportArchive \
             -archivePath "./build/AppStore.xcarchive" \
-            -exportOptionsPlist "ExportOptions.plist" \
-            -exportPath "./build/AppStoreExport" \
+            -exportOptionsPlist "ExportOptions-iOS.plist" \
+            -exportPath "./build/AppStoreExport-iOS" \
             -allowProvisioningUpdates \
             -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
 
+      # ── macOS Build ──────────────────────────────────────────────────
+      - name: Configure code signing for macOS
+        run: |
+          cd "Tools for Autodarts"
+          # Restore original pbxproj and re-patch for macOS
+          git checkout -- "Tools for Autodarts.xcodeproj/project.pbxproj"
+          python3 << 'PYEOF'
+          import os
+
+          pbxproj_path = "Tools for Autodarts.xcodeproj/project.pbxproj"
+          app_uuid = os.environ["MAC_APP_PROFILE_UUID"]
+          ext_uuid = os.environ["MAC_EXT_PROFILE_UUID"]
+
+          with open(pbxproj_path, 'r') as f:
+              content = f.read()
+
+          content = content.replace('CODE_SIGN_STYLE = Automatic', 'CODE_SIGN_STYLE = Manual')
+          content = content.replace('CODE_SIGN_IDENTITY = "Apple Development"', 'CODE_SIGN_IDENTITY = "Apple Distribution"')
+
+          content = content.replace(
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools.extension";',
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools.extension";\n\t\t\t\tPROVISIONING_PROFILE = "' + ext_uuid + '";'
+          )
+          content = content.replace(
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools";',
+              'PRODUCT_BUNDLE_IDENTIFIER = "com.boltapi.autodarts-tools";\n\t\t\t\tPROVISIONING_PROFILE = "' + app_uuid + '";'
+          )
+
+          with open(pbxproj_path, 'w') as f:
+              f.write(content)
+          print("macOS code signing configured")
+          PYEOF
+
+      - name: Build and Archive macOS for App Store
+        run: |
+          cd "Tools for Autodarts"
+          set -o pipefail
+          xcodebuild \
+            -project "Tools for Autodarts.xcodeproj" \
+            -scheme "Tools for Autodarts (macOS)" \
+            -configuration Release \
+            -archivePath "./build/AppStoreMac.xcarchive" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            archive \
+            2>&1 | tee xcodebuild-macos.log || {
+              echo "macOS build failed. Last 100 lines:"
+              tail -100 xcodebuild-macos.log
+              exit 1
+            }
+
+      - name: Export and Upload macOS to App Store Connect
+        run: |
+          cd "Tools for Autodarts"
+          cat > ExportOptions-macOS.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.boltapi.autodarts-tools</key>
+              <string>${MAC_APP_PROFILE_UUID}</string>
+              <key>com.boltapi.autodarts-tools.extension</key>
+              <string>${MAC_EXT_PROFILE_UUID}</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "./build/AppStoreMac.xcarchive" \
+            -exportOptionsPlist "ExportOptions-macOS.plist" \
+            -exportPath "./build/AppStoreExport-macOS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+      # ── Submit both platforms ────────────────────────────────────────
       - name: Submit for App Store Review
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}

@@ -35,4 +35,5 @@ git2md
 *.p12
 *.cer
 *.mobileprovision
+*.provisionprofile
 *.certSigningRequest
