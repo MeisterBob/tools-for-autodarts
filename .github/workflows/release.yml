@@ -277,10 +277,17 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Install provisioning profiles
+          # Install provisioning profiles with their UUID as filename
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_APP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
-          cp $PP_EXT_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+          APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PP_APP_PATH))
+          EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PP_EXT_PATH))
+
+          cp $PP_APP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${APP_PROFILE_UUID}.mobileprovision
+          cp $PP_EXT_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${EXT_PROFILE_UUID}.mobileprovision
+
+          echo "APP_PROFILE_UUID=${APP_PROFILE_UUID}" >> $GITHUB_ENV
+          echo "EXT_PROFILE_UUID=${EXT_PROFILE_UUID}" >> $GITHUB_ENV
 
       - name: Build and Archive for App Store
         run: |
@@ -292,7 +299,10 @@ jobs:
             -configuration Release \
             -archivePath "./build/AppStore.xcarchive" \
             -sdk iphoneos \
-            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            "PROVISIONING_PROFILE[sdk=iphoneos*]=${APP_PROFILE_UUID}" \
             archive \
             2>&1 | tee xcodebuild-appstore.log || {
               echo "Build failed. Last 100 lines:"
@@ -302,7 +312,7 @@ jobs:
 
       - name: Create ExportOptions.plist
         run: |
-          cat > "Tools for Autodarts/ExportOptions.plist" << 'PLIST'
+          cat > "Tools for Autodarts/ExportOptions.plist" << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -311,11 +321,22 @@ jobs:
             <string>app-store-connect</string>
             <key>destination</key>
             <string>upload</string>
+            <key>signingStyle</key>
+            <string>manual</string>
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.boltapi.autodarts-tools</key>
+              <string>${APP_PROFILE_UUID}</string>
+              <key>com.boltapi.autodarts-tools.extension</key>
+              <string>${EXT_PROFILE_UUID}</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
           </dict>
           </plist>
-          PLIST
+          EOF
 
       - name: Write App Store Connect API Key
         run: |
