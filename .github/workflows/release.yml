@@ -118,27 +118,20 @@ jobs:
       
       - name: Setup Xcode Environment
         run: |
-          # Run first launch to install additional required components
           sudo xcodebuild -runFirstLaunch
-          
-          # Accept Xcode license
           sudo xcodebuild -license accept
-      
-      - name: Verify iOS Platform Components
-        run: |
-          # Verify Xcode version and available SDKs
+
+          # Install iOS platform if not available
+          if ! xcodebuild -showsdks | grep -q "iphoneos"; then
+            echo "iOS SDK not found, downloading platform..."
+            xcodebuild -downloadPlatform iOS
+          fi
+
           echo "Xcode version:"
           xcodebuild -version
-          echo ""
           echo "Available SDKs:"
           xcodebuild -showsdks
-          echo ""
-          # Verify iOS SDK is available
-          if ! xcodebuild -showsdks | grep -q "iphoneos"; then
-            echo "ERROR: iOS SDK not found!"
-            exit 1
-          fi
-      
+
       - name: Build and Archive iOS App
         run: |
           cd "Tools for Autodarts"
@@ -246,6 +239,12 @@ jobs:
         run: |
           sudo xcodebuild -runFirstLaunch
           sudo xcodebuild -license accept
+
+          # Install iOS platform if not available
+          if ! xcodebuild -showsdks | grep -q "iphoneos"; then
+            echo "iOS SDK not found, downloading platform..."
+            xcodebuild -downloadPlatform iOS
+          fi
 
       - name: Install Apple Certificate and Provisioning Profile
         env:
