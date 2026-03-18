@@ -431,6 +431,8 @@ jobs:
             -archivePath "./build/AppStoreMac.xcarchive" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
             archive \
             2>&1 | tee xcodebuild-macos.log || {
               echo "macOS build failed. Last 100 lines:"
