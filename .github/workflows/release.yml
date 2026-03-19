@@ -76,7 +76,7 @@ jobs:
     permissions:
       contents: write # Allows this job to create releases
     
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 30
     needs: draft_release
 
@@ -113,7 +113,7 @@ jobs:
       - name: Install Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.1'
+          xcode-version: '26'
 
       - name: Setup Xcode Environment
         run: |
@@ -188,7 +188,7 @@ jobs:
     permissions:
       contents: read
 
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 30
     needs: [draft_release, build_ios_app]
     # Only submit from main branch (not prereleases)
@@ -223,7 +223,7 @@ jobs:
       - name: Install Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.1'
+          xcode-version: '26'
 
       - name: Setup Xcode Environment
         run: |
