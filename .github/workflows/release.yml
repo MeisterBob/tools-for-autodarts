@@ -495,10 +495,10 @@ jobs:
   check_version_change:
     permissions:
       contents: read
-    
+
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [draft_release, build_ios_app]
+    needs: [draft_release, build_ios_app, submit_to_app_store]
     outputs:
       version_changed: ${{ steps.compare-versions.outputs.version_changed }}
     
@@ -541,7 +541,7 @@ jobs:
     
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [draft_release, build_ios_app, check_version_change]
+    needs: [draft_release, build_ios_app, submit_to_app_store, check_version_change]
     if: needs.check_version_change.outputs.version_changed == 'true'
     
     steps:

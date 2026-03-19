@@ -85,10 +85,37 @@ function getBuildPlatform(build: any, included: any[]): string | undefined {
   )?.attributes?.platform;
 }
 
+// States where the version is already submitted or beyond — no action needed
+const SUBMITTED_STATES = new Set([
+  "WAITING_FOR_REVIEW",
+  "IN_REVIEW",
+  "PENDING_DEVELOPER_RELEASE",
+  "READY_FOR_DISTRIBUTION",
+  "PROCESSING_FOR_DISTRIBUTION",
+]);
+
 // ── Submit a single platform ─────────────────────────────────────────
 async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
   const platformLabel = platform === "IOS" ? "iOS" : "macOS";
   console.log(`\n── ${platformLabel} ──────────────────────────────────────`);
+
+  // 0. Check if version already exists and is already submitted/in review
+  try {
+    const versionsRes = await api(
+      `/apps/${appId}/appStoreVersions?filter[versionString]=${version}&filter[platform]=${platform}`,
+    );
+    const existingVersion = versionsRes.data[0];
+    if (existingVersion) {
+      const state = existingVersion.attributes?.appStoreState;
+      console.log(`   Existing version ${version} is in state: ${state}`);
+      if (SUBMITTED_STATES.has(state)) {
+        console.log(`ℹ️  ${platformLabel} version ${version} is already ${state.replace(/_/g, " ").toLowerCase()}. Skipping.`);
+        return;
+      }
+    }
+  } catch {
+    // If we can't check, proceed with normal flow
+  }
 
   // 1. Wait for build to be processed
   // Map platform to preReleaseVersion platform filter
