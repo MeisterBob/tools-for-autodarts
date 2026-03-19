@@ -38,6 +38,20 @@ function generateJWT(): string {
 
 let token = generateJWT();
 
+class ApiError extends Error {
+  status: number;
+  statusText: string;
+  body: string;
+
+  constructor(status: number, statusText: string, body: string) {
+    super(`API request failed: ${status} ${statusText}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.statusText = statusText;
+    this.body = body;
+  }
+}
+
 // ── API Helpers ──────────────────────────────────────────────────────
 async function api(endpoint: string, options: RequestInit = {}): Promise<any> {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
@@ -53,13 +67,22 @@ async function api(endpoint: string, options: RequestInit = {}): Promise<any> {
   const body = await res.text();
   if (!res.ok) {
     console.error(`API Error ${res.status} ${res.statusText}: ${body}`);
-    throw new Error(`API request failed: ${res.status} ${res.statusText}`);
+    throw new ApiError(res.status, res.statusText, body);
   }
   return body ? JSON.parse(body) : null;
 }
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getBuildPlatform(build: any, included: any[]): string | undefined {
+  const preReleaseVersionId = build.relationships?.preReleaseVersion?.data?.id;
+  if (!preReleaseVersionId) return undefined;
+
+  return included.find(item =>
+    item.type === "preReleaseVersions" && item.id === preReleaseVersionId,
+  )?.attributes?.platform;
 }
 
 // ── Submit a single platform ─────────────────────────────────────────
@@ -74,10 +97,11 @@ async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
   let build: any = null;
   for (let attempt = 0; attempt < 60; attempt++) {
     const buildsRes = await api(
-      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&filter[preReleaseVersion.platform]=${buildPlatform}&sort=-uploadedDate&limit=5`,
+      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&filter[preReleaseVersion.platform]=${buildPlatform}&include=preReleaseVersion&sort=-uploadedDate&limit=5`,
     );
+    const included = buildsRes.included ?? [];
     for (const b of buildsRes.data) {
-      if (b.attributes?.processingState === "VALID") {
+      if (b.attributes?.processingState === "VALID" && getBuildPlatform(b, included) === buildPlatform) {
         build = b;
         break;
       }
@@ -155,8 +179,8 @@ async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
       }),
     });
     console.log(`✅ ${platformLabel} version ${version} submitted for review!`);
-  } catch (err: any) {
-    if (err.message?.includes("403")) {
+  } catch (err: unknown) {
+    if (err instanceof ApiError && err.status === 403) {
       console.log(`ℹ️  ${platformLabel} version ${version} is already submitted for review.`);
     } else {
       throw err;
