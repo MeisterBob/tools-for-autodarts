@@ -14,9 +14,41 @@ defaults:
     shell: 'bash'
 
 jobs:
-  draft_release:
+  check_new_version:
     # Skip if the commit message contains the AltStore update message or [skip ci] (prevents infinite loop)
     if: ${{ !contains(github.event.head_commit.message, 'Update AltStore source for version') && !contains(github.event.head_commit.message, '[skip ci]') && github.event.head_commit.author.name != 'GitHub Action' }}
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      version_changed: ${{ steps.check.outputs.version_changed }}
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if version is new
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if a git tag already exists for this version
+          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists — skipping release"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $VERSION does not exist — proceeding with release"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+  draft_release:
+    needs: check_new_version
+    if: needs.check_new_version.outputs.version_changed == 'true'
     permissions:
       contents: write # Allows this job to create releases
 
