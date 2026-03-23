@@ -182,6 +182,7 @@ async function migrateConfig(currentConfigVersion: number) {
             enabled: false,
           };
         }
+        break;
     }
 
     await AutodartsToolsConfig.setValue(config);

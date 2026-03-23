@@ -34,15 +34,13 @@
         </div>
       </div>
       <div class="gradient-mask-left absolute inset-y-0 right-0 w-2/3">
-        <img :src="imageUrl" alt="Gotch Helper feature preview" class="size-full object-cover">
+        <img :src="imageUrl" alt="Gotcha Helper feature preview" class="size-full object-cover">
       </div>
     </div>
   </template>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
-
 import AppToggle from "../AppToggle.vue";
 
 import { AutodartsToolsConfig, type IConfig } from "@/utils/storage";

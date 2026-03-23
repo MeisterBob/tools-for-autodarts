@@ -629,7 +629,6 @@ async function processGameData(gameData: IGameData, oldGameData: IGameData, from
     }
   }
 
-
   const currentThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
   if (!currentThrow) return;
 
