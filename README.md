@@ -131,6 +131,13 @@ You can assign sounds to be played based on these triggers:
   - `next_player`: Plays when switching to the next player (fallback if no player name sound is found)
   - `bot`: Plays instead of player name when the player is a CPU/bot player
   - `playername`: Player name sounds play automatically when it's their turn. Example: If your name is `creazy.eth` on Autodarts, simply use `creazy.eth` (supports spaces or `_` like `player_name` or `player name`)
+- **Board Status**:
+  - `board_started`: When the board has started
+  - `board_stopped`: When the board has stopped or disconnected
+  - `manual_reset_done`: After a manual reset (also triggered when a new round starts)
+  - `takeout_finished`: When takeout has finished
+  - `calibration_started`: When calibration is started
+  - `calibration_finished`: When calibration has finished
 - **Cricket-Specific**:
   - `cricket_hit`: When a player hits a Cricket target (15-20 and Bull)
   - `cricket_miss`: When a player hits a non-Cricket target (Miss-14)
@@ -225,6 +232,13 @@ Add sound effects for various game events:
   - `ambient_lobby_out`: Plays when a player leaves the lobby
 - **Tournament Sounds**:
   - `ambient_tournament_ready`: Plays when "Time to ready up" text appears in tournaments
+- **Board Status Sounds** (only during a game):
+  - `ambient_board_started`: Plays when the board has started
+  - `ambient_board_stopped`: Plays when the board has stopped or disconnected
+  - `ambient_manual_reset_done`: Plays after a manual reset (also triggered when a new round starts)
+  - `ambient_takeout_finished`: Plays when takeout has finished
+  - `ambient_calibration_started`: Plays when calibration is started
+  - `ambient_calibration_finished`: Plays when calibration has finished
 - **Player-Specific Gameshot**: Create personalized winning sounds for specific players using the following formats:
   - `gameshot_player name` (spaces preserved)
   - `gameshot_player_name` (with underscores replacing spaces)

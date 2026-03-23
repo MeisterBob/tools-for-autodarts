@@ -3,6 +3,7 @@ import { AutodartsToolsConfig, type IConfig } from "@/utils/storage";
 import { getSoundFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
 
 let gameDataWatcherUnwatch: any;
+let boardDataWatcherUnwatch: any;
 let config: IConfig;
 
 // Audio player for Safari compatibility
@@ -33,6 +34,26 @@ const audioPool: HTMLAudioElement[] = [];
 let currentAudioIndex = 0;
 // Tracking URLs that need to be revoked
 const blobUrlsToRevoke: string[] = [];
+
+function checkBoardStatus(boardData: IBoard): void {
+  const boardEvent = boardData.event;
+  const boardStatus = boardData.status;
+
+  if (boardEvent === "Started" && boardStatus === "Throw")
+    playSound("board_started");
+  else if (boardEvent === "Stopped" && boardStatus === "Stopped")
+    playSound("board_stopped");
+  else if (boardEvent === "Disconnected" && (boardStatus === "Offline" || boardStatus === ""))
+    playSound("board_stopped");
+  else if (boardEvent === "Manual reset" && boardStatus === "Throw")
+    playSound("manual_reset_done");
+  else if (boardEvent === "Takeout finished" && boardStatus === "Throw")
+    playSound("takeout_finished");
+  else if (boardEvent === "Calibration started")
+    playSound("calibration_started");
+  else if (boardEvent === "Calibration finished")
+    playSound("calibration_finished");
+}
 
 export async function caller() {
   console.log("Autodarts Tools: caller");
@@ -68,6 +89,13 @@ export async function caller() {
         processGameData(gameData, gameData);
       }
     }
+
+    if (!boardDataWatcherUnwatch) {
+      boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
+        if (!config?.caller?.enabled) return;
+        checkBoardStatus(boardData);
+      });
+    }
   } catch (error) {
     console.error("Autodarts Tools: caller initialization error", error);
   }
@@ -78,6 +106,11 @@ export function callerOnRemove() {
   if (gameDataWatcherUnwatch) {
     gameDataWatcherUnwatch();
     gameDataWatcherUnwatch = null;
+  }
+
+  if (boardDataWatcherUnwatch) {
+    boardDataWatcherUnwatch();
+    boardDataWatcherUnwatch = null;
   }
 
   // Clear any pending debounce timer
