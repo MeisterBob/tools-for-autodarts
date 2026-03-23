@@ -1,15 +1,27 @@
-# :dart: Tools for Autodarts :dart:
+# :dart: Tools for Autodarts v2.2.8 :dart:
 
-### :green_apple: Apple App Store is back!
-Thanks to our amazing community hitting the donation goal on Ko-fi (<https://ko-fi.com/creazy231>), I was able to bring **Tools for Autodarts** back to the Apple App Store for both **macOS** and **iOS**! :tada:
+### :new: What's new
 
-The newest version is already approved by Apple and will get rolled out soon.
+:video_game: **Gotcha Helper**
+Shows how many points the other players are ahead in Gotcha game variant — including the dart throw needed to catch up (e.g. `+15`, `D10`, `T20`, `BULL`).
 
-:arrow_right: Download on the App Store: <https://apps.apple.com/de/app/tools-for-autodarts/id6479754594>
+:speaking_head: **Text-to-Speech (TTS)**
+Generate caller and sound FX audio directly from text using your device's built-in voices! Select a voice, adjust speed & pitch, preview before saving — settings are remembered across sessions.
 
-A huge **thank you** to everyone who supported this through their donations — you made this possible! :heart:
+:bulb: **More Board Event Triggers**
+New triggers for Caller, Sound FX, and WLED:
+- Caller & Sound FX: `board_started`, `board_stopped`, `manual_reset_done`, `takeout_finished`, `calibration_started`, `calibration_finished`
+- WLED: `board_starting`, `board_stopping`, `throw`, `last_throw`, `takeout_finished`
 
-:warning: Not all features have been fully tested on macOS and iOS yet. If you run into any issues, please report them so we can get them fixed!
+### :wrench: Fixes
+- Fixed animation triggers playing incorrectly when busted on last throw
+- Fixed Automatic Next Leg countdown not cleaning up properly between legs
+- Fixed WLED CSV import parsing
+
+### :handshake: Community
+Thanks to **@MeisterBob** for contributing the Gotcha Helper, WLED board events, and WLED CSV import fix! :tada:
+
+---
 
 Please report any bugs in
 :flag_de: https://discord.com/channels/802528604067201055/1255293632110530612/1255293632110530612
