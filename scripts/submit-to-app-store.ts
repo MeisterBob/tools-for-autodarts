@@ -154,7 +154,7 @@ async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
   let build: any = null;
   for (let attempt = 0; attempt < 60; attempt++) {
     const buildsRes = await api(
-      `/builds?filter[app]=${appId}&filter[version]=${version}&filter[processingState]=VALID&filter[preReleaseVersion.platform]=${buildPlatform}&include=preReleaseVersion&sort=-uploadedDate&limit=5`,
+      `/builds?filter[app]=${appId}&filter[preReleaseVersion.version]=${version}&filter[processingState]=VALID&filter[preReleaseVersion.platform]=${buildPlatform}&include=preReleaseVersion&sort=-uploadedDate&limit=5`,
     );
     const included = buildsRes.included ?? [];
     for (const b of buildsRes.data) {

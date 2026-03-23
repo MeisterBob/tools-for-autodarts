@@ -216,16 +216,15 @@ jobs:
           files: |
             .output/autodarts-tools-ios.ipa
 
-  # TEMP: Full build+sign+upload+submit for 2.2.8 (version already created on App Store Connect, no builds uploaded)
-  # TODO: Restore normal submit_to_app_store job (with needs: [draft_release, build_ios_app]) after this runs once
   submit_to_app_store:
     permissions:
       contents: read
 
     runs-on: macos-26
     timeout-minutes: 30
-    # No dependency on draft_release/build_ios_app — just run on push to main
-    if: github.ref == 'refs/heads/main'
+    needs: [draft_release, build_ios_app]
+    # Only submit from main branch (not prereleases)
+    if: needs.draft_release.outputs.prerelease == 'false'
 
     steps:
       - uses: actions/checkout@v3
