@@ -657,6 +657,14 @@ async function processGameData(gameData: IGameData, oldGameData: IGameData, from
         playSound("cricket_miss");
       }
     }
+  } else if (gameData.match.variant === 'Gotcha') {
+    const currentScores = gameData.match.gameScores;
+    const previousScores = oldGameData?.match?.gameScores;
+    if (previousScores && previousScores.length === currentScores.length
+      && currentScores[gameData.match.player] > 0
+      && currentScores.some((score, i) => score === 0 && previousScores[i] > 0)) {
+      playSound("ambient_gotcha");
+    }
   }
 
   const currentThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];

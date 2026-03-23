@@ -188,29 +188,26 @@
 
             <!-- Fourth row of feature cards -->
             <StreamingMode @toggle="openSettingsModal('streaming-mode')" @setting-change="updateConfig" class="feature-card" data-feature-index="14" />
+            <LargerLegsSets @toggle="openSettingsModal('larger-legs-sets')" @setting-change="updateConfig" class="feature-card" data-feature-index="15" />
 
             <!-- Fifth row of feature cards -->
-            <LargerLegsSets @toggle="openSettingsModal('larger-legs-sets')" @setting-change="updateConfig" class="feature-card" data-feature-index="15" />
             <LargerPlayerNames @toggle="openSettingsModal('larger-player-names')" @setting-change="updateConfig" class="feature-card" data-feature-index="16" />
+            <LargerPlayerMatchData @toggle="openSettingsModal('larger-player-match-data')" @setting-change="updateConfig" class="feature-card" data-feature-index="17" />
 
             <!-- Sixth row of feature cards -->
-            <LargerPlayerMatchData @toggle="openSettingsModal('larger-player-match-data')" @setting-change="updateConfig" class="feature-card" data-feature-index="17" />
             <WinnerAnimation @setting-change="updateConfig" class="feature-card" data-feature-index="18" />
-
-            <!-- Seventh row of feature cards -->
             <AutomaticFullscreen @setting-change="updateConfig" class="feature-card" data-feature-index="19" />
 
-            <!-- Eighth row of feature cards -->
+            <!-- Seventh row of feature cards -->
             <Zoom @toggle="openSettingsModal('zoom')" @setting-change="updateConfig" class="feature-card" data-feature-index="20" />
-
-            <!-- Ninth row of feature cards -->
             <QuickCorrection @toggle="openSettingsModal('quick-correction')" @setting-change="updateConfig" class="feature-card" data-feature-index="21" />
 
-            <!-- Tenth row of feature cards -->
+            <!-- Eighth row of feature cards -->
             <EnhancedScoringDisplay @setting-change="updateConfig" class="feature-card" data-feature-index="22" />
-
-            <!-- Eleventh row of feature cards -->
             <InstantReplay @toggle="openSettingsModal('instant-replay')" @setting-change="updateConfig" class="feature-card" data-feature-index="23" />
+
+            <!-- Ninth row of feature cards -->
+            <Gotcha @setting-change="updateConfig" class="feature-card" data-feature-index="24" />
           </div>
 
           <!-- Feature cards grid for Boards tab -->
@@ -291,6 +288,7 @@ import Zoom from "./Settings/Zoom.vue";
 import QuickCorrection from "./Settings/QuickCorrection.vue";
 import EnhancedScoringDisplay from "./Settings/EnhancedScoringDisplay.vue";
 import InstantReplay from "./Settings/InstantReplay.vue";
+import Gotcha from "./Settings/Gotcha.vue";
 
 import packageConfig from "../package.json";
 
