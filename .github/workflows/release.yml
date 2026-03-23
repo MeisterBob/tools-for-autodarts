@@ -7,16 +7,48 @@ name: release
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 defaults:
   run:
     shell: 'bash'
 
 jobs:
-  draft_release:
+  check_new_version:
     # Skip if the commit message contains the AltStore update message or [skip ci] (prevents infinite loop)
     if: ${{ !contains(github.event.head_commit.message, 'Update AltStore source for version') && !contains(github.event.head_commit.message, '[skip ci]') && github.event.head_commit.author.name != 'GitHub Action' }}
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      version_changed: ${{ steps.check.outputs.version_changed }}
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if version is new
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if a git tag already exists for this version
+          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists — skipping release"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $VERSION does not exist — proceeding with release"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+  draft_release:
+    needs: check_new_version
+    if: needs.check_new_version.outputs.version_changed == 'true'
     permissions:
       contents: write # Allows this job to create releases
 
@@ -76,8 +108,7 @@ jobs:
     permissions:
       contents: write # Allows this job to create releases
     
-    # Use macos-14 which has Xcode 15.x pre-installed with iOS platforms ready to use
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 30
     needs: draft_release
 
@@ -114,32 +145,15 @@ jobs:
       - name: Install Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          # Use Xcode 15.4 - stable version with iOS platform pre-installed on macos-14 runners
-          xcode-version: '15.4'
-      
+          xcode-version: '26'
+
       - name: Setup Xcode Environment
         run: |
-          # Run first launch to install additional required components
-          sudo xcodebuild -runFirstLaunch
-          
-          # Accept Xcode license
+          sudo xcodebuild -runFirstLaunch || true
           sudo xcodebuild -license accept
-      
-      - name: Verify iOS Platform Components
-        run: |
-          # Verify Xcode version and available SDKs
-          echo "Xcode version:"
           xcodebuild -version
-          echo ""
-          echo "Available SDKs:"
-          xcodebuild -showsdks
-          echo ""
-          # Verify iOS SDK is available
-          if ! xcodebuild -showsdks | grep -q "iphoneos"; then
-            echo "ERROR: iOS SDK not found!"
-            exit 1
-          fi
-      
+          xcodebuild -showsdks | grep iphoneos
+
       - name: Build and Archive iOS App
         run: |
           cd "Tools for Autodarts"
@@ -205,7 +219,7 @@ jobs:
   check_version_change:
     permissions:
       contents: read
-    
+
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [draft_release, build_ios_app]
