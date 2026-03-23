@@ -1,5 +1,5 @@
 import { AutodartsToolsGameData, type IGameData } from "@/utils/game-data-storage";
-import { AutodartsToolsConfig, type IConfig } from "@/utils/storage";
+import { AutodartsToolsConfig, type IConfig, type ISoundTTS } from "@/utils/storage";
 import { getSoundFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
 
 let gameDataWatcherUnwatch: any;
@@ -8,7 +8,7 @@ let config: IConfig;
 // Audio player for Safari compatibility
 let audioPlayer: HTMLAudioElement | null = null;
 // Queue for sounds to be played
-const soundQueue: { url?: string; base64?: string; name?: string; soundId?: string }[] = [];
+const soundQueue: { url?: string; base64?: string; name?: string; soundId?: string; tts?: ISoundTTS }[] = [];
 // Flag to track if we're currently playing a sound
 let isPlaying = false;
 // Flag to track if audio has been unlocked
@@ -88,6 +88,11 @@ export function callerOnRemove() {
 
   // Reset gameshot cooldown timestamp
   lastGameshotTimestamp = 0;
+
+  // Cancel any ongoing TTS
+  if (window.speechSynthesis) {
+    speechSynthesis.cancel();
+  }
 
   // Clean up audio player
   if (audioPlayer) {
@@ -707,12 +712,13 @@ function playSound(trigger: string): void {
           console.log(soundToPlay);
 
           // Add to queue
-          if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId) {
+          if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId || soundToPlay.tts) {
             soundQueue.push({
               url: soundToPlay.url,
               base64: soundToPlay.base64,
               name: soundToPlay.name,
               soundId: soundToPlay.soundId,
+              tts: soundToPlay.tts,
             });
 
             // Also try to play the number sound right after
@@ -725,12 +731,13 @@ function playSound(trigger: string): void {
               const randomNumberIndex = Math.floor(Math.random() * numberSounds.length);
               const numberSoundToPlay = numberSounds[randomNumberIndex];
 
-              if (numberSoundToPlay.url || numberSoundToPlay.base64 || numberSoundToPlay.soundId) {
+              if (numberSoundToPlay.url || numberSoundToPlay.base64 || numberSoundToPlay.soundId || numberSoundToPlay.tts) {
                 soundQueue.push({
                   url: numberSoundToPlay.url,
                   base64: numberSoundToPlay.base64,
                   name: numberSoundToPlay.name,
                   soundId: numberSoundToPlay.soundId,
+                  tts: numberSoundToPlay.tts,
                 });
                 console.log(`Autodarts Tools: Added number "${number}" sound to queue`);
               }
@@ -776,12 +783,13 @@ function playSound(trigger: string): void {
           const soundToPlay = matchingSounds[randomIndex];
 
           // Add to queue
-          if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId) {
+          if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId || soundToPlay.tts) {
             soundQueue.push({
               url: soundToPlay.url,
               base64: soundToPlay.base64,
               name: soundToPlay.name,
               soundId: soundToPlay.soundId,
+              tts: soundToPlay.tts,
             });
 
             // Also try to play the number sound right after
@@ -794,12 +802,13 @@ function playSound(trigger: string): void {
               const randomNumberIndex = Math.floor(Math.random() * numberSounds.length);
               const numberSoundToPlay = numberSounds[randomNumberIndex];
 
-              if (numberSoundToPlay.url || numberSoundToPlay.base64 || numberSoundToPlay.soundId) {
+              if (numberSoundToPlay.url || numberSoundToPlay.base64 || numberSoundToPlay.soundId || numberSoundToPlay.tts) {
                 soundQueue.push({
                   url: numberSoundToPlay.url,
                   base64: numberSoundToPlay.base64,
                   name: numberSoundToPlay.name,
                   soundId: numberSoundToPlay.soundId,
+                  tts: numberSoundToPlay.tts,
                 });
                 console.log(`Autodarts Tools: Added number "${fallbackTrigger}" sound to queue`);
               }
@@ -859,12 +868,13 @@ function playSound(trigger: string): void {
     const soundToPlay = matchingSounds[randomIndex];
 
     // Add to queue
-    if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId) {
+    if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId || soundToPlay.tts) {
       soundQueue.push({
         url: soundToPlay.url,
         base64: soundToPlay.base64,
         name: soundToPlay.name,
         soundId: soundToPlay.soundId,
+        tts: soundToPlay.tts,
       });
 
       // Start playing if not already playing
@@ -897,6 +907,12 @@ async function playNextSound(): Promise<void> {
   if (nextSound) {
     try {
       console.log(`Autodarts Tools: Playing sound: ${nextSound.name || "unnamed"}`);
+
+      // Handle TTS sounds
+      if (nextSound.tts) {
+        playTTSSound(nextSound.tts);
+        return;
+      }
 
       // Try to load from IndexedDB first if soundId is present
       if (nextSound.soundId && isIndexedDBAvailable()) {
@@ -977,6 +993,51 @@ async function playNextSound(): Promise<void> {
     console.error("Autodarts Tools: nextSound is unexpectedly empty even though queue had items");
     isPlaying = false;
   }
+}
+
+/**
+ * Play a TTS sound using the Web Speech API
+ */
+function playTTSSound(tts: ISoundTTS): void {
+  if (!window.speechSynthesis) {
+    console.error("Autodarts Tools: speechSynthesis not available");
+    playNextSound();
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(tts.text);
+  const voices = speechSynthesis.getVoices();
+
+  // Try exact voice match by URI
+  let voice = voices.find(v => v.voiceURI === tts.voiceURI);
+  // Fallback: match by language
+  if (!voice && tts.lang) {
+    voice = voices.find(v => v.lang === tts.lang);
+  }
+  if (voice) utterance.voice = voice;
+
+  utterance.rate = tts.rate;
+  utterance.pitch = tts.pitch;
+
+  // Safety timeout for iOS (10 seconds)
+  const safetyTimeout = setTimeout(() => {
+    console.warn("Autodarts Tools: TTS safety timeout reached");
+    speechSynthesis.cancel();
+    playNextSound();
+  }, 10000);
+
+  utterance.onend = () => {
+    clearTimeout(safetyTimeout);
+    console.log("Autodarts Tools: TTS playback ended");
+    playNextSound();
+  };
+  utterance.onerror = (e) => {
+    clearTimeout(safetyTimeout);
+    console.error("Autodarts Tools: TTS playback error", e);
+    playNextSound();
+  };
+
+  speechSynthesis.speak(utterance);
 }
 
 /**

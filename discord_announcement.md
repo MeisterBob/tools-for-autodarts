@@ -1,17 +1,19 @@
-# :dart: Tools for Autodarts v2.2.7 Released! :dart:
+# :dart: Tools for Autodarts :dart:
 
-### :bug: Bug Fixes
-- **Authentication**: Completely reworked how the extension captures your login token — it now intercepts the Keycloak token endpoint directly, making auth reliable again across all features
-- **Quick Correction**: Fixed API calls that were failing due to a missing `Bearer` prefix in the Authorization header — corrections should work properly again
-- **Automatic Fullscreen**: Fixed the fullscreen toggle button not appearing or rendering incorrectly after recent Autodarts UI changes; also fixed button placement in Bull-off matches
-- **Zoom**: Fixed the Live mode button sometimes not being clicked on match start
+### :green_apple: Apple App Store is back!
+Thanks to our amazing community hitting the donation goal on Ko-fi (<https://ko-fi.com/creazy231>), I was able to bring **Tools for Autodarts** back to the Apple App Store for both **macOS** and **iOS**! :tada:
 
-### :loudspeaker: Improvements
-- **Sound FX – Tournament Ready**: The ready-up sound now also triggers for German and Dutch players (previously only worked with the English interface)
+The newest version is already approved by Apple and will get rolled out soon.
+
+:arrow_right: Download on the App Store: <https://apps.apple.com/de/app/tools-for-autodarts/id6479754594>
+
+A huge **thank you** to everyone who supported this through their donations — you made this possible! :heart:
+
+:warning: Not all features have been fully tested on macOS and iOS yet. If you run into any issues, please report them so we can get them fixed!
 
 Please report any bugs in
 :flag_de: https://discord.com/channels/802528604067201055/1255293632110530612/1255293632110530612
 :flag_gb: https://discord.com/channels/802528604067201055/1255293651756650616/1255293651756650616
 or on GitHub: <https://github.com/creazy231/tools-for-autodarts/issues>
 
-_Updates getting rolled out right now. Keep an eye on the [GitHub](https://github.com/creazy231/tools-for-autodarts/tree/main?tab=readme-ov-file#tools-for-autodarts) page for the status of each browser_
+_Updates getting rolled out right now. Keep an eye on the GitHub page for the status of each browser:_ <https://github.com/creazy231/tools-for-autodarts/tree/main?tab=readme-ov-file#tools-for-autodarts>

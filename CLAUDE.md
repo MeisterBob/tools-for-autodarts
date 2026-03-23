@@ -127,3 +127,13 @@ Version bump in `package.json` triggers the CI pipeline (`.github/workflows/rele
 - `utils/types.ts` — Game data types
 - `components/PageConfig.vue` — Main settings UI with tab navigation
 - `entrypoints/background.ts` — Fetch relay and download chunking
+- `README.md` — User-facing documentation of all features, installation, and configuration
+
+## README Maintenance
+
+When adding, changing, or removing a feature, **always update `README.md`** to reflect the change. The README is the primary user-facing documentation and must stay in sync with the codebase.
+
+- **New feature** — Add it to the relevant section (Lobby, Match, Gameplay, Audio, WLED, Animations, Utility) with a description, configuration options, and supported triggers if applicable
+- **Changed feature** — Update the existing description, options, or trigger list
+- **Removed feature** — Remove the section entirely
+- **New triggers** — Add them to the trigger list in the relevant feature section

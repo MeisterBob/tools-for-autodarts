@@ -157,6 +157,14 @@ export interface IConfig {
   };
 }
 
+export interface ISoundTTS {
+  text: string;
+  voiceURI: string;
+  lang: string;
+  rate: number;
+  pitch: number;
+}
+
 export interface ISound {
   name: string;
   url: string;
@@ -164,6 +172,7 @@ export interface ISound {
   enabled: boolean;
   triggers: string[];
   soundId?: string;
+  tts?: ISoundTTS;
 }
 
 export interface IAnimation {

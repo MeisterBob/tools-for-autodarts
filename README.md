@@ -102,6 +102,7 @@ Tools for Autodarts is a browser extension that enhances your gaming experience 
 - **Caller**: Voice announcements for scores, checkouts, and each dart thrown during gameplay
 - **Sound FX**: Ambient sound effects for different game events
 - **Sound Upload**: Add your own custom sounds for personalized feedback
+- **Text-to-Speech (TTS)**: Generate custom caller and sound FX audio directly from text using your device's built-in voices
 - **WLED Integration**: Trigger lighting effects and HTTP requests synchronized with game events
 
 ### 🗣️ Caller Feature
@@ -111,6 +112,7 @@ The Caller feature provides voice announcements during your darts gameplay, simi
 - **Call Every Dart**: Announces each dart as it's thrown, rather than waiting for the end of a turn
 - **Call Checkout**: Announces possible checkout combinations when a player is on a checkout score
 - **Custom Sound Library**: Add, edit, and organize voice clips for different game events
+- **Text-to-Speech (TTS) Generation**: Generate caller sounds directly from text using the built-in "Generate TTS" button — no external files needed. Select from any voice installed on your device, adjust speed and pitch, and preview before saving. Your last-used voice, speed, and pitch settings are remembered across sessions.
 - **Bulk Upload with Trigger Assignment**: When uploading multiple files, you can assign the same trigger to all files at once, making it easy to set up larger sound sets without manually assigning triggers to each file individually
 
 #### Supported Triggers
@@ -270,6 +272,19 @@ The Sound FX feature includes a sophisticated multi-level fallback system:
   - Generic gameshot: `ambient_gameshot`
 - If no match is found after all fallback attempts, no sound is played
 
+#### Text-to-Speech (TTS) Generation
+Generate sound effects directly from text without needing external audio files:
+- **Generate TTS Button**: Available in the Sound FX settings toolbar alongside Upload and Delete buttons
+- **Voice Selection**: Choose from any voice installed on your operating system (varies by platform)
+- **Speed & Pitch Control**: Adjust speech rate (0.5x–2x) and pitch (0–2) with sliders
+- **Prelisten**: Preview the generated speech before saving
+- **Persistent Settings**: Your last-used voice, speed, and pitch are remembered across sessions
+- **Cross-Platform**: Works on Desktop (Chrome, Firefox, Edge, Safari), iOS Safari, and Android Chrome using the Web Speech API
+- **Trigger Assignment**: Assign triggers to TTS sounds just like any other sound
+
+> [!NOTE]
+> TTS sounds use your device's built-in speech synthesis and are generated live during playback. Voice availability and quality depend on your operating system. Short phrases work best for dart calling use cases.
+
 #### Bulk Upload with Trigger Assignment
 - **Multi-File Upload**: Upload multiple sound files at once for faster setup
 - **Bulk Trigger Assignment**: When "Generate triggers from filenames" is disabled, you can assign the same trigger to all uploaded files at once
@@ -277,7 +292,7 @@ The Sound FX feature includes a sophisticated multi-level fallback system:
 
 #### Technical Features
 - **Queue Management**: Enhanced sound queue management to prevent overlapping and ensure proper playback order (improved in v2.0.3)
-- **Format Support**: Plays both URL-based sounds and base64-encoded audio
+- **Format Support**: Plays both URL-based sounds, base64-encoded audio, and TTS (text-to-speech) sounds
 - **IndexedDB Storage**: Efficiently stores sound files in browser database to improve performance
 - **Error Handling**: Automatically falls back to alternative sources if a sound fails to play
 - **Safari Compatible**: Works with all major browsers including Safari's strict audio policies

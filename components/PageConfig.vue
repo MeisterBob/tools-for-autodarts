@@ -89,37 +89,60 @@
           :tabs="tabs"
         />
 
-        <!-- Danger Zone -->
-        <div v-if="showDangerZone" class="adt-container space-y-6">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold text-red-400">
-              Danger Zone
-            </h2>
-            <AppButton @click="toggleDangerZone" auto class="text-white/70 hover:text-white">
-              <span class="icon-[pixelarticons--close]" />
+        <!-- Advanced Settings -->
+        <div v-if="showDangerZone" class="space-y-5">
+          <!-- Ko-fi Support Section -->
+          <div class="adt-container space-y-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-bold text-white">
+                Support the Project
+              </h2>
+              <AppButton @click="toggleDangerZone" auto class="text-white/70 hover:text-white">
+                <span class="icon-[pixelarticons--close]" />
+              </AppButton>
+            </div>
+            <p class="text-white/70">
+              Autodarts Tools is free and open source. If you enjoy using it, consider supporting the development to keep it going!
+            </p>
+            <AppButton
+              @click="openKofi"
+              type="success"
+              auto
+            >
+              <span class="icon-[pixelarticons--heart] mr-2" />
+              <span>Support on Ko-fi</span>
             </AppButton>
           </div>
-          <div class="space-y-4">
-            <p class="text-white/70">
-              These actions are destructive and cannot be undone. Please proceed with caution and may export your settings before proceeding.
-            </p>
-            <div class="rounded border border-red-500/30 bg-red-500/5 p-4">
-              <div class="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                <div>
-                  <h3 class="font-semibold text-red-300">
+
+          <!-- Danger Zone -->
+          <div class="adt-container space-y-6">
+            <div class="flex items-center">
+              <h2 class="text-xl font-bold text-red-400">
+                Danger Zone
+              </h2>
+            </div>
+            <div class="space-y-4">
+              <p class="text-white/70">
+                These actions are destructive and cannot be undone. Please proceed with caution and may export your settings before proceeding.
+              </p>
+              <div class="rounded border border-red-500/30 bg-red-500/5 p-4">
+                <div class="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                  <div>
+                    <h3 class="font-semibold text-red-300">
+                      Reset All Settings
+                    </h3>
+                    <p class="text-sm text-white/60">
+                      This will reset all settings to their default values. All your customizations will be lost.
+                    </p>
+                  </div>
+                  <AppButton
+                    @click="resetAllSettings"
+                    auto
+                    type="danger"
+                  >
                     Reset All Settings
-                  </h3>
-                  <p class="text-sm text-white/60">
-                    This will reset all settings to their default values. All your customizations will be lost.
-                  </p>
+                  </AppButton>
                 </div>
-                <AppButton
-                  @click="resetAllSettings"
-                  auto
-                  type="danger"
-                >
-                  Reset All Settings
-                </AppButton>
               </div>
             </div>
           </div>
@@ -655,6 +678,10 @@ function importSettings() {
 
 // State for danger zone
 const showDangerZone = ref(false);
+
+function openKofi() {
+  window.open("https://ko-fi.com/creazy231", "_blank", "noopener,noreferrer");
+}
 
 function toggleDangerZone() {
   showDangerZone.value = !showDangerZone.value;
