@@ -4,6 +4,7 @@ import { getSoundFxFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "
 
 let gameDataWatcherUnwatch: any;
 let lobbyDataWatcherUnwatch: any;
+let boardDataWatcherUnwatch: any;
 let tournamentReadyObserver: MutationObserver | null = null;
 let config: IConfig;
 
@@ -41,6 +42,26 @@ let currentAudioIndex = 0;
 let currentAudioIndex2 = 0;
 // Tracking URLs that need to be revoked
 const blobUrlsToRevoke: string[] = [];
+
+function checkBoardStatus(boardData: IBoard): void {
+  const boardEvent = boardData.event;
+  const boardStatus = boardData.status;
+
+  if (boardEvent === "Started" && boardStatus === "Throw")
+    playSound("ambient_board_started", 2);
+  else if (boardEvent === "Stopped" && boardStatus === "Stopped")
+    playSound("ambient_board_stopped", 2);
+  else if (boardEvent === "Disconnected" && (boardStatus === "Offline" || boardStatus === ""))
+    playSound("ambient_board_stopped", 2);
+  else if (boardEvent === "Manual reset" && boardStatus === "Throw")
+    playSound("ambient_manual_reset_done", 2);
+  else if (boardEvent === "Takeout finished" && boardStatus === "Throw")
+    playSound("ambient_takeout_finished", 2);
+  else if (boardEvent === "Calibration started")
+    playSound("ambient_calibration_started", 2);
+  else if (boardEvent === "Calibration finished")
+    playSound("ambient_calibration_finished", 2);
+}
 
 export async function soundFx() {
   console.log("Autodarts Tools: Sound FX");
@@ -95,6 +116,13 @@ export async function soundFx() {
       });
     }
 
+    if (!boardDataWatcherUnwatch) {
+      boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
+        if (!config?.soundFx?.enabled) return;
+        checkBoardStatus(boardData);
+      });
+    }
+
     if (!tournamentReadyObserver) {
       tournamentReadyObserver = new MutationObserver((mutations) => {
         if (!config?.soundFx?.enabled) return;
@@ -135,6 +163,11 @@ export function soundFxOnRemove() {
   if (lobbyDataWatcherUnwatch) {
     lobbyDataWatcherUnwatch();
     lobbyDataWatcherUnwatch = null;
+  }
+
+  if (boardDataWatcherUnwatch) {
+    boardDataWatcherUnwatch();
+    boardDataWatcherUnwatch = null;
   }
 
   if (tournamentReadyObserver) {
