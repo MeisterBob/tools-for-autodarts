@@ -124,6 +124,8 @@ async function processAtcRtwShanghaiData(
       targetField = round
       break;
   }
+  const trigger = `target${targetField}`
   console.log(`Autodarts Tools: WLED: current target ${targetField}`)
-  return `target${targetField}`
+  if (triggerPresentCB(trigger)) return trigger
+  return null
 }
