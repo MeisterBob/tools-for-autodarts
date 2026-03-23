@@ -99,22 +99,52 @@ async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
   const platformLabel = platform === "IOS" ? "iOS" : "macOS";
   console.log(`\n── ${platformLabel} ──────────────────────────────────────`);
 
-  // 0. Check if version already exists and is already submitted/in review
-  try {
-    const versionsRes = await api(
-      `/apps/${appId}/appStoreVersions?filter[versionString]=${version}&filter[platform]=${platform}`,
-    );
-    const existingVersion = versionsRes.data[0];
-    if (existingVersion) {
-      const state = existingVersion.attributes?.appStoreState;
-      console.log(`   Existing version ${version} is in state: ${state}`);
-      if (SUBMITTED_STATES.has(state)) {
-        console.log(`ℹ️  ${platformLabel} version ${version} is already ${state.replace(/_/g, " ").toLowerCase()}. Skipping.`);
+  // 0. Check if version already exists
+  const versionsRes = await api(
+    `/apps/${appId}/appStoreVersions?filter[versionString]=${version}&filter[platform]=${platform}`,
+  );
+  const existingVersion = versionsRes.data[0];
+
+  if (existingVersion) {
+    const state = existingVersion.attributes?.appStoreState;
+    console.log(`   Existing version ${version} is in state: ${state}`);
+    if (SUBMITTED_STATES.has(state)) {
+      console.log(`ℹ️  ${platformLabel} version ${version} is already ${state.replace(/_/g, " ").toLowerCase()}. Skipping.`);
+      return;
+    }
+
+    // Version exists and is ready for submission (e.g. PREPARE_FOR_SUBMISSION)
+    // Check if a build is already attached
+    if (state === "PREPARE_FOR_SUBMISSION") {
+      const buildRelRes = await api(`/appStoreVersions/${existingVersion.id}/build`);
+      if (buildRelRes.data) {
+        console.log(`   Build already attached: ${buildRelRes.data.id}`);
+        console.log("📤 Submitting for review...");
+        try {
+          await api("/appStoreVersionSubmissions", {
+            method: "POST",
+            body: JSON.stringify({
+              data: {
+                type: "appStoreVersionSubmissions",
+                relationships: {
+                  appStoreVersion: {
+                    data: { type: "appStoreVersions", id: existingVersion.id },
+                  },
+                },
+              },
+            }),
+          });
+          console.log(`✅ ${platformLabel} version ${version} submitted for review!`);
+        } catch (err: unknown) {
+          if (err instanceof ApiError && err.status === 403) {
+            console.log(`ℹ️  ${platformLabel} version ${version} is already submitted for review.`);
+          } else {
+            throw err;
+          }
+        }
         return;
       }
     }
-  } catch {
-    // If we can't check, proceed with normal flow
   }
 
   // 1. Wait for build to be processed
@@ -168,10 +198,10 @@ async function submitPlatform(appId: string, platform: "IOS" | "MAC_OS") {
     console.log(`   Created version ${version}`);
   } catch {
     console.log("   Version may already exist, looking for it...");
-    const versionsRes = await api(
+    const foundRes = await api(
       `/apps/${appId}/appStoreVersions?filter[versionString]=${version}&filter[platform]=${platform}`,
     );
-    appStoreVersion = versionsRes.data[0];
+    appStoreVersion = foundRes.data[0];
     if (!appStoreVersion) {
       console.log(`⚠️  Could not create or find ${platformLabel} version ${version}, skipping.`);
       return;
