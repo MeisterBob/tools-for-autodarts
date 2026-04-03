@@ -1,8 +1,14 @@
-import { AutodartsToolsGameData, type IGameData } from "@/utils/game-data-storage";
 import { AutodartsToolsConfig, type IConfig, type ISoundTTS } from "@/utils/storage";
 import { getSoundFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
+import {
+  initGameDataProcessor,
+  registerGameDataCallback,
+  unregisterGameDataCallback,
+  type IGameTrigger,
+} from "@/composables/useGameDataProcessor";
+import type { IGameData } from "@/utils/game-data-storage";
 
-let gameDataWatcherUnwatch: any;
+let gameDataProcessorUnwatch: (() => void) | null = null;
 let boardDataWatcherUnwatch: any;
 let config: IConfig;
 
@@ -14,10 +20,6 @@ const soundQueue: { url?: string; base64?: string; name?: string; soundId?: stri
 let isPlaying = false;
 // Flag to track if audio has been unlocked
 let audioUnlocked = false;
-// Debounce timer for processing game data
-let debounceTimer: number | null = null;
-// Debounce delay in milliseconds
-const DEBOUNCE_DELAY = 200;
 // Cooldown tracking for gameshot/matchshot sounds (to prevent multiple triggers from AI referee)
 let lastGameshotTimestamp: number = 0;
 const GAMESHOT_COOLDOWN_MS = 10000; // 10 seconds cooldown
@@ -60,34 +62,26 @@ export async function caller() {
 
   try {
     config = await AutodartsToolsConfig.getValue();
-    const gameData = await AutodartsToolsGameData.getValue();
     console.log("Autodarts Tools: Config loaded", config?.caller?.sounds?.length || 0, "sounds available");
+
+    // Initialize the centralized game data processor
+    await initGameDataProcessor();
 
     // Initialize audio player for Safari compatibility
     initAudioPlayer();
 
-    if (!gameDataWatcherUnwatch) {
-      gameDataWatcherUnwatch = AutodartsToolsGameData.watch((gameData: IGameData, oldGameData: IGameData) => {
+    // Register with centralized game data processor (only once)
+    if (!gameDataProcessorUnwatch) {
+      registerGameDataCallback("caller", async (triggers: IGameTrigger[], gameData: IGameData) => {
         if (!config?.caller?.enabled) return;
-        console.log("Autodarts Tools: caller game data updated");
-
-        // Debounce the processGameData call
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
+        await processGameDataFromTriggers(triggers, gameData);
+      }, {
+        sortOrder: "asc",
+        priorityOverrides: {
+          [TRIGGER_PRIORITIES.INDIVIDUAL_THROW]: 35,
         }
-
-        debounceTimer = window.setTimeout(() => {
-          processGameData(gameData, oldGameData, true);
-          debounceTimer = null;
-        }, DEBOUNCE_DELAY);
       });
-
-      const url = window.location.href;
-      const matchId = url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0];
-
-      if (gameData.match?.id === matchId) {
-        processGameData(gameData, gameData);
-      }
+      gameDataProcessorUnwatch = () => unregisterGameDataCallback("caller");
     }
 
     if (!boardDataWatcherUnwatch) {
@@ -103,20 +97,15 @@ export async function caller() {
 
 export function callerOnRemove() {
   console.log("Autodarts Tools: caller on remove");
-  if (gameDataWatcherUnwatch) {
-    gameDataWatcherUnwatch();
-    gameDataWatcherUnwatch = null;
+
+  if (gameDataProcessorUnwatch) {
+    gameDataProcessorUnwatch();
+    gameDataProcessorUnwatch = null;
   }
 
   if (boardDataWatcherUnwatch) {
     boardDataWatcherUnwatch();
     boardDataWatcherUnwatch = null;
-  }
-
-  // Clear any pending debounce timer
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
   }
 
   // Reset gameshot cooldown timestamp
@@ -393,275 +382,70 @@ function isSoundInQueue(trigger: string): boolean {
 }
 
 /**
- * Process game data to trigger sounds based on game events
+ * Process game triggers to play sounds based on events
+ * This is called by the centralized game data processor with derived triggers
  */
 let lastScore: number = 0;
-async function processGameData(gameData: IGameData, oldGameData: IGameData, fromWebSocket: boolean = false): Promise<void> {
+async function processGameDataFromTriggers(
+  triggers: IGameTrigger[],
+  gameData: IGameData,
+): Promise<void> {
   if (!gameData.match || !gameData.match.turns?.length) return;
 
-  const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
-  if (editMode) {
-    // If in edit mode, stop all sounds that are currently playing
-    stopAllSounds();
-    return;
-  }
+  console.log("Autodarts Tools: Caller: processing triggers", triggers)
 
-  if (gameData.match.variant === "Bull-off") return;
-
-  // This is for cricket to prevent playing the score when not changed since last round
-  if (gameData.match.turns[0].throws.length === 0) {
-    lastScore = gameData.match.gameScores[gameData.match.player];
-  }
-
-  // Play gameon sound if it's the first round and variant is not Bull-off
-  if (gameData.match.round === 1 && gameData.match.turns[0].throws.length === 0 && gameData.match.player === 0 && gameData.match.variant !== "Bull-off") {
-    const playerName = gameData.match.players?.[gameData.match.player]?.name;
-    const isBot = !!gameData.match.players?.[gameData.match.player]?.cpuPPR;
-    if (isBot) {
-      playSound("bot");
-    } else if (playerName) {
-      const playerNameLower = playerName.toLowerCase();
-      const playerNameWithUnderscores = playerNameLower.replace(/\s+/g, "_");
-
-      // Check if either version of the name has a sound
-      const hasPlayerNameSound = config.caller.sounds?.some(sound =>
-        sound.enabled && sound.triggers && (
-          sound.triggers.includes(playerNameLower)
-          || (playerNameWithUnderscores !== playerNameLower && sound.triggers.includes(playerNameWithUnderscores))
-        ),
-      );
-
-      if (hasPlayerNameSound) {
-        // Try both versions of the name if they're different
-        if (playerNameWithUnderscores !== playerNameLower) {
-          playSound(playerNameLower);
-          playSound(playerNameWithUnderscores);
-        } else {
-          playSound(playerNameLower);
-        }
-      }
+  // Handle gameshot/matchshot cooldown
+  const hasGameshot = triggers.some(t => t.trigger === "gameshot" || t.trigger === "matchshot");
+  if (hasGameshot) {
+    const now = Date.now();
+    if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
+      console.log("Autodarts Tools: Skipping gameshot/matchshot sound due to cooldown");
+      return;
     }
-
-    // Play gameon after player name/bot (moved from beginning of block)
-    if (!isSoundInQueue("gameon") && !fromWebSocket) playSound("gameon");
-  } else if (oldGameData?.match?.player !== undefined
-    && gameData.match.player !== undefined
-    && oldGameData.match.player !== gameData.match.player
-    && gameData.match.round >= 1) {
-    // Get player name and play sound with player name as trigger
-    const currentPlayer = gameData.match.players?.[gameData.match.player];
-    const playerName = currentPlayer?.name;
-    const isBot = !!currentPlayer?.cpuPPR;
-
-    if (isBot) {
-      console.log("Autodarts Tools: Bot player detected");
-      playSound("bot");
-    } else if (playerName) {
-      console.log("Autodarts Tools: Player changed to", playerName);
-      // Try to play the player name (both regular and underscore version), if no sound found, fall back to next_player
-      const playerNameLower = playerName.toLowerCase();
-      const playerNameWithUnderscores = playerNameLower.replace(/\s+/g, "_");
-      const hasPlayerNameSound = config.caller.sounds?.some(sound =>
-        sound.enabled && sound.triggers && (
-          sound.triggers.includes(playerNameLower)
-          || (playerNameWithUnderscores !== playerNameLower && sound.triggers.includes(playerNameWithUnderscores))
-        ),
-      );
-
-      if (hasPlayerNameSound) {
-        console.log(`Autodarts Tools: Found player name sound for "${playerNameLower}" or "${playerNameWithUnderscores}"`);
-        // Try both versions of the name
-        if (playerNameWithUnderscores !== playerNameLower) {
-          playSound(playerNameLower);
-          playSound(playerNameWithUnderscores);
-        } else {
-          playSound(playerNameLower);
-        }
-      } else {
-        playSound("next_player");
-      }
-    }
+    lastGameshotTimestamp = now;
   }
 
-  // Check for checkout guide
-  if (gameData.match.state?.checkoutGuide?.length) {
-    console.log("Autodarts Tools: Checkout guide available");
-
-    // Get the current player's score from gameScores
+  // Process checkout guide triggers if applicable
+  if (gameData.match.state?.checkoutGuide?.length && gameData.match.turns[0].throws.length === 0) {
     const currentPlayerIndex = gameData.match.player;
     const currentScore = gameData.match.gameScores[currentPlayerIndex];
 
-    // Only play "you require" when there are 0 throws in the current turn
-    if (config.caller.callCheckout && currentScore > 0 && gameData.match.turns[0].throws.length === 0) {
-      console.log(`Autodarts Tools: Playing checkout guide sound for ${currentScore}`);
+    if (currentScore > 0) {
+      // Try specific checkout sounds first (yr_XXX, you_require_XXX)
+      const checkoutTriggers = [
+        `yr_${currentScore}`,
+        `you_require_${currentScore}`,
+        "you_require",
+      ];
 
-      // First check for short form yr_XXX sound (e.g., "yr_120")
-      const shortTrigger = `yr_${currentScore}`;
-      const hasShortSound = config.caller.sounds?.some(sound =>
-        sound.enabled && sound.triggers && sound.triggers.includes(shortTrigger),
-      );
-
-      if (hasShortSound) {
-        console.log(`Autodarts Tools: Using short checkout sound: ${shortTrigger}`);
-        playSound(shortTrigger);
-      } else {
-        // Then check for specific you_require_XXX sound (e.g., "you_require_120")
-        const specificTrigger = `you_require_${currentScore}`;
-        const hasSpecificSound = config.caller.sounds?.some(sound =>
-          sound.enabled && sound.triggers && sound.triggers.includes(specificTrigger),
+      for (const trigger of checkoutTriggers) {
+        const hasTrigger = config.caller.sounds?.some(sound =>
+          sound.enabled && sound.triggers && sound.triggers.includes(trigger),
         );
-
-        if (hasSpecificSound) {
-          console.log(`Autodarts Tools: Using specific checkout sound: ${specificTrigger}`);
-          playSound(specificTrigger);
-        } else {
-          console.log(`Autodarts Tools: No specific sound found for ${specificTrigger}, using fallback`);
-          // Fall back to "you_require" followed by the player's current score
-          playSound("you_require");
-          playSound(`s${currentScore}`);
+        if (hasTrigger) {
+          playSound(trigger);
+          // If it's the "you_require" fallback, also play the score
+          if (trigger === "you_require") {
+            playSound(`s${currentScore}`);
+          }
+          return;
         }
       }
     }
   }
 
-  const currentThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
-  if (!currentThrow) return;
-
-  // const currentPlayerIndex = gameData.match.player;
-  const isLastThrow: boolean = gameData.match.turns[0].throws.length >= 3;
-  const throwName: string = currentThrow.segment.name; // S1
-  const throwBed: string = currentThrow.segment.bed;
-  const winner: boolean = gameData.match.gameWinner >= 0; // use this for matchshot later || (gameData.match.variant === "X01" && gameData.match.gameScores[currentPlayerIndex] === 0);
-  const winnerMatch: boolean = gameData.match.winner >= 0;
-  const busted: boolean = gameData.match.turns[0].busted;
-  const score: number = gameData.match.turns[0].score;
-  const points: number = gameData.match.turns[0].points;
-  const combinedThrows: string = gameData.match.turns[0].throws.map(t => t.segment.name.toLowerCase()).join("_");
-
-  // For non-Cricket variants, use normal sound logic
-  if (gameData.match.variant !== "Cricket") {
-    if (winner) {
-      // Check cooldown to prevent multiple gameshot/matchshot sounds (e.g., from AI referee)
-      const now = Date.now();
-      if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
-        console.log("Autodarts Tools: Skipping gameshot/matchshot sound due to cooldown");
-        return;
-      }
-      lastGameshotTimestamp = now;
-
-      if (winnerMatch) {
-        playSound("matchshot");
-      } else {
-        playSound("gameshot");
-      }
-      const winnerPlayer = gameData.match.players?.find(player => player.index === gameData.match?.winner);
-      const winnerPlayerName = winnerPlayer?.name;
-      const isBot = !!winnerPlayer?.cpuPPR;
-
-      if (isBot) {
-        playSound("bot");
-      } else if (winnerPlayerName) {
-        playSound(winnerPlayerName.toLowerCase());
-      }
-    } else if (busted) {
-      playSound("busted");
-    } else if (isLastThrow) {
-      if (config.caller.callEveryDart) {
-        // Special case: if throwName is "25" and throwBed is "Single", check for "s25" first
-        if (throwName.toLowerCase() === "25" && throwBed === "Single") {
-          const hasS25Sound = config.caller.sounds?.some(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("s25"),
-          );
-          if (hasS25Sound) {
-            playSound("s25");
-          } else {
-            playSound(throwName.toLowerCase());
-          }
-        } else {
-          playSound(throwName.toLowerCase());
-        }
-      }
-      // Only play points sound if there's more than one player
-      playSound(points.toString());
-      playSound(combinedThrows);
-    } else {
-      if (config.caller.callEveryDart) {
-        // Special case: if throwName is "25" and throwBed is "Single", check for "s25" first
-        if (throwName.toLowerCase() === "25" && throwBed === "Single") {
-          const hasS25Sound = config.caller.sounds?.some(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("s25"),
-          );
-          if (hasS25Sound) {
-            playSound("s25");
-          } else {
-            playSound(throwName.toLowerCase());
-          }
-        } else {
-          playSound(throwName.toLowerCase());
-        }
-      }
+  // Play sounds for each category (only one per category, highest priority)
+  const playedCategories = new Set<string>();
+  for (const trigger of triggers) {
+    // Skip certain ambient triggers for caller (they're more for SoundFx)
+    if (trigger.category === "ambient" && trigger.trigger.startsWith("ambient_")) {
+      continue;
     }
-  } else {
-    // For Cricket, handle only winner and busted sounds (not the individual throws)
-    if (winner) {
-      // Check cooldown to prevent multiple gameshot/matchshot sounds (e.g., from AI referee)
-      const now = Date.now();
-      if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
-        console.log("Autodarts Tools: Skipping gameshot/matchshot sound due to cooldown (Cricket)");
-        return;
-      }
-      lastGameshotTimestamp = now;
 
-      if (winnerMatch) {
-        playSound("matchshot");
-      } else {
-        playSound("gameshot");
-      }
-      const winnerPlayer = gameData.match.players?.find(player => player.index === gameData.match?.winner);
-      const winnerPlayerName = winnerPlayer?.name;
-      const isBot = !!winnerPlayer?.cpuPPR;
-
-      if (isBot) {
-        playSound("bot");
-      } else if (winnerPlayerName) {
-        playSound(winnerPlayerName.toLowerCase());
-      }
-    } else if (busted) {
-      playSound("busted");
-    } else if (gameData.match.players && gameData.match.players.length > 1 && isLastThrow) {
-      if (config.caller.callEveryDart) {
-        // Special case: if throwName is "25" and throwBed is "Single", check for "s25" first
-        if (throwName.toLowerCase() === "25" && throwBed === "Single") {
-          const hasS25Sound = config.caller.sounds?.some(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("s25"),
-          );
-          if (hasS25Sound) {
-            playSound("s25");
-          } else {
-            playSound(throwName.toLowerCase());
-          }
-        } else {
-          playSound(throwName.toLowerCase());
-        }
-      }
-      if (score !== lastScore) playSound(score.toString());
-      lastScore = score;
-    } else {
-      if (config.caller.callEveryDart) {
-        // Special case: if throwName is "25" and throwBed is "Single", check for "s25" first
-        if (throwName.toLowerCase() === "25" && throwBed === "Single") {
-          const hasS25Sound = config.caller.sounds?.some(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("s25"),
-          );
-          if (hasS25Sound) {
-            playSound("s25");
-          } else {
-            playSound(throwName.toLowerCase());
-          }
-        } else {
-          playSound(throwName.toLowerCase());
-        }
-      }
+    // Only play the first trigger from each category (they're already sorted by priority)
+    if (!playedCategories.has(trigger.category)) {
+      playedCategories.add(trigger.category);
+      playSound(trigger.trigger);
     }
   }
 }
@@ -1209,7 +993,7 @@ function createAudioBlobUrl(base64Data: string): string | null {
       }
     }
 
-    const blob = new Blob([ bytes ], { type: mimeType });
+    const blob = new Blob([bytes], { type: mimeType });
     return URL.createObjectURL(blob);
   } catch (error) {
     console.error("Autodarts Tools: Failed to create blob URL", error);

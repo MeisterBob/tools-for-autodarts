@@ -13,9 +13,11 @@ declare global {
   const $shallowRef: typeof import('vue/macros')['$shallowRef']
   const $toRef: typeof import('vue/macros')['$toRef']
   const EffectScope: typeof import('vue')['EffectScope']
+  const TRIGGER_PRIORITIES: typeof import('./composables/useGameDataProcessor')['TRIGGER_PRIORITIES']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const browser: typeof import('#imports')['browser']
+  const cleanupGameDataProcessor: typeof import('./composables/useGameDataProcessor')['cleanupGameDataProcessor']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -48,6 +50,7 @@ declare global {
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const h: typeof import('vue')['h']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
+  const initGameDataProcessor: typeof import('./composables/useGameDataProcessor')['initGameDataProcessor']
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
   const injectScript: typeof import('#imports')['injectScript']
@@ -94,6 +97,7 @@ declare global {
   const refDefault: typeof import('@vueuse/core')['refDefault']
   const refThrottled: typeof import('@vueuse/core')['refThrottled']
   const refWithControl: typeof import('@vueuse/core')['refWithControl']
+  const registerGameDataCallback: typeof import('./composables/useGameDataProcessor')['registerGameDataCallback']
   const resolveComponent: typeof import('vue')['resolveComponent']
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
@@ -119,6 +123,7 @@ declare global {
   const tryOnUnmounted: typeof import('@vueuse/core')['tryOnUnmounted']
   const unref: typeof import('vue')['unref']
   const unrefElement: typeof import('@vueuse/core')['unrefElement']
+  const unregisterGameDataCallback: typeof import('./composables/useGameDataProcessor')['unregisterGameDataCallback']
   const until: typeof import('@vueuse/core')['until']
   const useActiveElement: typeof import('@vueuse/core')['useActiveElement']
   const useAnimate: typeof import('@vueuse/core')['useAnimate']
@@ -185,6 +190,7 @@ declare global {
   const useFocusWithin: typeof import('@vueuse/core')['useFocusWithin']
   const useFps: typeof import('@vueuse/core')['useFps']
   const useFullscreen: typeof import('@vueuse/core')['useFullscreen']
+  const useGameDataProcessor: typeof import('./composables/useGameDataProcessor')['useGameDataProcessor']
   const useGamepad: typeof import('@vueuse/core')['useGamepad']
   const useGeolocation: typeof import('@vueuse/core')['useGeolocation']
   const useGlobalEvent: typeof import('./composables/useEventBus')['useGlobalEvent']
@@ -308,4 +314,7 @@ declare global {
   // @ts-ignore
   export type { Component, ComponentPublicInstance, ComputedRef, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, VNode, WritableComputedRef } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { TRIGGER_PRIORITIES } from './composables/useGameDataProcessor'
+  import('./composables/useGameDataProcessor')
 }

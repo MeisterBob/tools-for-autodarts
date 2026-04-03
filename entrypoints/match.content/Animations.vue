@@ -26,9 +26,13 @@ import { twMerge } from "tailwind-merge";
 
 import type { IGameData } from "@/utils/game-data-storage";
 
-import { AutodartsToolsGameData } from "@/utils/game-data-storage";
 import { getAnimationFromOPFS, isOPFSAvailable, triggerPatterns } from "@/utils/helpers";
 import { AutodartsToolsConfig, type IAnimation } from "@/utils/storage";
+import {
+  useGameDataProcessor,
+  initGameDataProcessor,
+  type IGameTrigger,
+} from "@/composables/useGameDataProcessor";
 
 // Constants
 const FADE_DURATION = 300; // ms
@@ -82,10 +86,11 @@ onMounted(async () => {
   console.log("Autodarts Tools: Animations mounted");
 
   try {
+    // Load config
     config.value = await AutodartsToolsConfig.getValue();
-    AutodartsToolsGameData.watch((gameData: IGameData) => {
-      processGameData(gameData);
-    });
+
+    // Initialize the centralized game data processor
+    await initGameDataProcessor();
 
     // Update board position
     updateBoardPosition();
@@ -95,6 +100,17 @@ onMounted(async () => {
 
     // Set up an interval to check for board position changes
     updateInterval = setInterval(updateBoardPosition, 1000);
+
+    // Register with centralized game data processor
+    // useGameDataProcessor handles onUnmounted cleanup automatically
+    useGameDataProcessor("animations", async (triggers: IGameTrigger[], gameData: IGameData) => {
+      if (!triggers.length || !gameData.match) return;
+
+      // For animations, we only want to play the highest priority trigger
+      // since we can only show one animation at a time
+      const trigger = triggers[0];
+      await playAnimation(trigger.trigger);
+    });
   } catch (error) {
     console.error("Autodarts Tools: Animation initialization error", error);
   }
@@ -109,6 +125,7 @@ onUnmounted(() => {
   for (const url of Object.values(animationCache.value)) {
     URL.revokeObjectURL(url);
   }
+  // useGameDataProcessor cleanup is handled automatically via onUnmounted in the composable
 });
 
 function updateBoardPosition(): void {
@@ -138,41 +155,6 @@ function hideAnimation(): void {
     isFadingOut.value = false;
     isFadingIn.value = false;
   }, FADE_DURATION);
-}
-
-/**
- *
- * INFO:
- * 50 will get processed as "bull"
- */
-async function processGameData(gameData: IGameData): Promise<void> {
-  if (!gameData.match || gameData.match.activated !== undefined || !gameData.match.turns?.length) return;
-
-  if (gameData.match.variant === "Bull-off") return;
-
-  const currentThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
-  if (!currentThrow) return;
-
-  const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
-  if (editMode) abortAnimation();
-
-  const isLastThrow: boolean = gameData.match.turns[0].throws.length >= 3;
-  const throwName: string = currentThrow.segment.name; // S1
-  const winner: boolean = gameData.match.gameWinner >= 0;
-  const busted: boolean = gameData.match.turns[0].busted;
-  const points: number = gameData.match.turns[0].points;
-  const miss: boolean = throwName.toLocaleLowerCase().startsWith("m");
-  const combinedThrows: string = gameData.match.turns[0].throws.map(t => t.segment.name.toLowerCase()).join("_");
-
-  playAnimation(throwName.toLowerCase());
-  if (winner) playAnimation("gameshot");
-  if (busted) playAnimation("busted");
-  if (isLastThrow && !busted) {
-    playAnimation(points.toString());
-    await new Promise(resolve => setTimeout(resolve, 500));
-    playAnimation(combinedThrows);
-  }
-  if (miss) playAnimation("outside");
 }
 
 /**

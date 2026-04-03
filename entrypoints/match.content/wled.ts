@@ -1,23 +1,27 @@
 import type { ILobbies } from "@/utils/websocket-helpers";
 
-import { AutodartsToolsGameData, type IGameData } from "@/utils/game-data-storage";
+import type { IGameData } from "@/utils/game-data-storage";
 import { AutodartsToolsLobbyData } from "@/utils/lobby-data-storage";
 import { AutodartsToolsBoardData, type IBoard } from "@/utils/board-data-storage";
 import { AutodartsToolsTournamentData, type ITournament } from "@/utils/tournament-data-storage";
 import { AutodartsToolsConfig, type IConfig, type IWled } from "@/utils/storage";
 import { triggerPatterns } from "@/utils/helpers";
 import { gameDataProcessor } from "@/utils/wled";
+import {
+  initGameDataProcessor,
+  registerGameDataCallback,
+  unregisterGameDataCallback,
+  type IGameTrigger,
+} from "@/composables/useGameDataProcessor";
 import { WledType } from "#imports";
+import { forIn } from "lodash";
 
-let gameDataWatcherUnwatch: any;
+let gameDataProcessorUnwatch: (() => void) | null = null;
 let lobbyDataWatcherUnwatch: any;
 let boardDataWatcherUnwatch: any;
 let tournamentDataWatcherUnwatch: any;
 let config: IConfig;
 let currentBoardId: string;
-
-let debounceTimer: number | null = null;
-const DEBOUNCE_DELAY = 200;
 
 function eventTrigger(trigger: string) {
   if (isTriggerPresent(trigger) &&
@@ -71,34 +75,19 @@ export async function wledFx() {
 
   try {
     config = await AutodartsToolsConfig.getValue();
-    const gameData = await AutodartsToolsGameData.getValue();
     console.log(`Autodarts Tools: WLED: Config loaded, ${config.wledFx?.effects?.length || 0} effects available`);
 
-    if (!gameDataWatcherUnwatch) {
-      gameDataWatcherUnwatch = AutodartsToolsGameData.watch(
-        (gameData: IGameData, oldGameData: IGameData) => {
-          if (!config.wledFx?.enabled) return;
+    // Initialize the centralized game data processor
+    await initGameDataProcessor();
 
-          // Debounce the processGameData call
-          if (debounceTimer) {
-            clearTimeout(debounceTimer);
-          }
-
-          debounceTimer = window.setTimeout(() => {
-            processGameData(gameData, oldGameData, true);
-            debounceTimer = null;
-          }, DEBOUNCE_DELAY);
-        },
-      );
-
-      const url = window.location.href;
-      const matchId = url.match(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
-      )?.[0];
-
-      if (gameData.match?.id === matchId) {
-        processGameData(gameData, gameData);
-      }
+    // Register with centralized game data processor (only once)
+    if (!gameDataProcessorUnwatch) {
+      registerGameDataCallback("wled", async (triggers: IGameTrigger[], gameData: IGameData) => {
+        console.log("Autodarts Tools: WLED: Processing triggers", triggers.length, "triggers");
+        if (!config.wledFx?.enabled) return;
+        await processGameDataFromTriggers(triggers, gameData);
+      });
+      gameDataProcessorUnwatch = () => unregisterGameDataCallback("wled");
     }
 
     if (!lobbyDataWatcherUnwatch) {
@@ -151,9 +140,10 @@ export async function wledFx() {
 
 export function wledFxOnRemove() {
   console.log("Autodarts Tools: WLED: wledFx on remove");
-  if (gameDataWatcherUnwatch) {
-    gameDataWatcherUnwatch();
-    gameDataWatcherUnwatch = null;
+
+  if (gameDataProcessorUnwatch) {
+    gameDataProcessorUnwatch();
+    gameDataProcessorUnwatch = null;
   }
 
   if (lobbyDataWatcherUnwatch) {
@@ -175,82 +165,58 @@ export function wledFxOnRemove() {
 }
 
 /**
- * Process game data to trigger effects based on game events
+ * Process game triggers to set WLED effects
+ * This is called by the centralized game data processor with derived triggers
  */
-async function processGameData(
+async function processGameDataFromTriggers(
+  triggers: IGameTrigger[],
   gameData: IGameData,
-  oldGameData: IGameData,
-  fromWebSocket: boolean = false,
 ): Promise<void> {
   if (!gameData.match || !gameData.match.turns?.length) return;
 
-  const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
-  if (editMode) return;
-  if (gameData.match.variant === "Bull-off" && isTriggerPresent("bulloff")) {
-    setEffectByTrigger("bulloff");
-    return;
-  }
-
-  // gameon is the default effect to play when no other event happened
-  let nextEffect: string | IWled = "gameon";
-
-  // Play player effect when it's the next players turn
-  if (gameData.match.turns[0].throws.length === 0) {
-    const currentPlayer = gameData.match.players?.[gameData.match.player];
-    const isBot = currentPlayer?.cpuPPR !== null;
-    const playerName = currentPlayer?.name;
-
-    if (isBot) {
-      console.log("Autodarts Tools: WLED: Bot player detected");
-      nextEffect = "bot_throw";
-    } else if (playerName) {
-      // Try to find player effect (both regular and underscore version)
-      const playerNameLower = playerName.toLowerCase();
-      const playerNameWithUnderscores = playerNameLower.replace(/\s+/g, "_");
-      const playerNameEffects = config.wledFx.effects?.filter(
-        effect =>
-          effect.enabled
-          && effect.triggers
-          && (effect.triggers.includes(playerNameLower)
-            || effect.triggers.includes(playerNameWithUnderscores)),
-      );
-
-      if (playerNameEffects.length > 0) {
-        console.log(
-          `Autodarts Tools: WLED: Found player name effect for ${playerNameWithUnderscores}`,
-        );
-
-        const randomIndex = Math.floor(Math.random() * playerNameEffects.length);
-        nextEffect = playerNameEffects[randomIndex];
-      }
-    }
-  }
-
-  const effect: string | null = await gameDataProcessor(gameData, oldGameData, fromWebSocket, isTriggerPresent);
-  if (effect) {
-    // found effect for match variant
-    nextEffect = effect;
-  }
+  console.log("Autodarts Tools: WLED: processing triggers", triggers)
 
   currentBoardId = gameData.match.players?.[gameData.match.player].boardId;
 
-  if (
-    config.wledFx.boardIds.length > 0
-    && isTriggerPresent("other")
-    && !config.wledFx.boardIds.includes(currentBoardId)
-  ) {
-    nextEffect = "other";
+  // For WLED, we only want to play the highest priority trigger
+  // since LED effects can typically only show one at a time
+  if (triggers.length === 0) {
+    // Fallback to gameon if no triggers
+    setEffectByTrigger("gameon");
+    return;
   }
 
-  if (typeof nextEffect === "string") setEffectByTrigger(nextEffect);
-  else setEffect(nextEffect);
+  // Check board filtering if configured
+  if (
+    config.wledFx.boardIds.length > 0 &&
+    isTriggerPresent("other") &&
+    !config.wledFx.boardIds.includes(currentBoardId)
+  ) {
+    setEffectByTrigger("other");
+    return;
+  }
+
+  // Set effect based on the highest priority trigger that is available
+  for (const i in triggers) {
+    console.log("Autodarts Tools: WLED: trying", triggers[i].trigger);
+    if (isTriggerPresent(triggers[i].trigger)) {
+      setEffectByTrigger(triggers[i].trigger);
+      return;
+    }
+  }
+
+  // no effect was available, fall back to gameon
+  setEffectByTrigger("gameon");
 }
 
 function isTriggerPresent(trigger: string): boolean {
   const present: boolean = config.wledFx.effects?.some(
     effect => effect.enabled && effect?.triggers.includes(trigger),
   );
-  if (present) return present;
+  if (present) {
+    console.log("Autodarts Tools: WLED: isTriggerPresent: found trigger", trigger);
+    return present;
+  }
 
   // search for range trigger(range_[min]_[max])
   const points = Number(trigger);
