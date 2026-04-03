@@ -158,6 +158,9 @@ export interface IConfig {
   gotcha: {
     enabled: boolean;
   };
+  checkoutGuide: {
+    enabled: boolean;
+  };
 }
 
 export interface ISoundTTS {
@@ -340,7 +343,7 @@ export interface IWled {
 export type TBoardStatus = BoardStatus | undefined;
 
 export const defaultConfig: IConfig = {
-  version: 21,
+  version: 22,
   discord: {
     enabled: false,
     manually: false,
@@ -713,6 +716,9 @@ export const defaultConfig: IConfig = {
     ],
   },
   gotcha: {
+    enabled: false,
+  },
+  checkoutGuide: {
     enabled: false,
   },
 };

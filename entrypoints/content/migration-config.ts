@@ -183,6 +183,15 @@ async function migrateConfig(currentConfigVersion: number) {
           };
         }
         break;
+      case 21:
+        // Migration from version 21 to version 22
+        config.version = 22;
+        if (!config.checkoutGuide) {
+          config.checkoutGuide = {
+            enabled: false,
+          };
+        }
+        break;
     }
 
     await AutodartsToolsConfig.setValue(config);
