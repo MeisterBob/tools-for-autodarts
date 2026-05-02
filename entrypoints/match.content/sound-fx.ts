@@ -1,7 +1,6 @@
 import { AutodartsToolsConfig, type IConfig, type ISound, type ISoundTTS } from "@/utils/storage";
 import { getSoundFxFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
 import {
-  initGameDataProcessor,
   registerGameDataCallback,
   unregisterGameDataCallback,
   type IGameTrigger,
@@ -70,10 +69,7 @@ export async function soundFx() {
 
   try {
     config = await AutodartsToolsConfig.getValue();
-    console.log("Autodarts Tools: Config loaded", config?.soundFx?.sounds?.length || 0, "sounds available");
-
-    // Initialize the centralized game data processor
-    await initGameDataProcessor();
+    console.log("Autodarts Tools: Sound FX: Config loaded", config?.soundFx?.sounds?.length || 0, "sounds available");
 
     // Initialize audio player for Safari compatibility
     initAudioPlayer();
@@ -119,7 +115,7 @@ export async function soundFx() {
         // Check if "Time to ready up" text appears in the DOM
         const bodyText = document.body.textContent || document.body.innerText;
         if (bodyText.includes("Time to ready up") || bodyText.includes("Zeit zum bereitmachen") || bodyText.includes("Tijd om je klaar te maken")) {
-          console.log("Autodarts Tools: Found 'Time to ready up' text, playing tournament ready sound");
+          console.log("Autodarts Tools: Sound FX: Found 'Time to ready up' text, playing tournament ready sound");
           playSound("ambient_tournament_ready");
 
           // Disconnect the observer after playing the sound once
@@ -138,12 +134,12 @@ export async function soundFx() {
       });
     }
   } catch (error) {
-    console.error("Autodarts Tools: soundFx initialization error", error);
+    console.error("Autodarts Tools: Sound FX: soundFx initialization error", error);
   }
 }
 
 export function soundFxOnRemove() {
-  console.log("Autodarts Tools: soundFx on remove");
+  console.log("Autodarts Tools: Sound FX: on remove");
 
   if (gameDataProcessorUnwatch) {
     gameDataProcessorUnwatch();
@@ -206,7 +202,7 @@ export function soundFxOnRemove() {
     try {
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("Autodarts Tools: Error revoking URL", e);
+      console.error("Autodarts Tools: Sound FX: Error revoking URL", e);
     }
   });
   blobUrlsToRevoke.length = 0;
@@ -227,7 +223,7 @@ function initAudioPlayer(): void {
 
     // Handle errors
     audioPlayer.addEventListener("error", (e) => {
-      console.error("Autodarts Tools: Audio playback error", e);
+      console.error("Autodarts Tools: Sound FX: Audio playback error", e);
       // Move to next sound on error
       playNextSound(1);
     });
@@ -236,11 +232,11 @@ function initAudioPlayer(): void {
     for (let i = 0; i < AUDIO_POOL_SIZE; i++) {
       const audio = new Audio();
       audio.addEventListener("ended", () => {
-        console.log("Autodarts Tools: Pool audio ended");
+        console.log("Autodarts Tools: Sound FX: Pool audio ended");
         playNextSound(1);
       });
       audio.addEventListener("error", (error) => {
-        console.error("Autodarts Tools: Pool audio error", error);
+        console.error("Autodarts Tools: Sound FX: Pool audio error", error);
         document.addEventListener("click", unlockAudio, { once: true });
         document.addEventListener("touchstart", unlockAudio, { once: true });
         document.addEventListener("keydown", unlockAudio, { once: true });
@@ -257,7 +253,7 @@ function initAudioPlayer(): void {
 
     // Handle errors for second player
     audioPlayer2.addEventListener("error", (e) => {
-      console.error("Autodarts Tools: Audio playback error (channel 2)", e);
+      console.error("Autodarts Tools: Sound FX: Audio playback error (channel 2)", e);
       // Move to next sound on error
       playNextSound(2);
     });
@@ -266,11 +262,11 @@ function initAudioPlayer(): void {
     for (let i = 0; i < AUDIO_POOL_SIZE; i++) {
       const audio = new Audio();
       audio.addEventListener("ended", () => {
-        console.log("Autodarts Tools: Pool audio ended (channel 2)");
+        console.log("Autodarts Tools: Sound FX: Pool audio ended (channel 2)");
         playNextSound(2);
       });
       audio.addEventListener("error", (error) => {
-        console.error("Autodarts Tools: Pool audio error (channel 2)", error);
+        console.error("Autodarts Tools: Sound FX: Pool audio error (channel 2)", error);
         document.addEventListener("click", unlockAudio, { once: true });
         document.addEventListener("touchstart", unlockAudio, { once: true });
         document.addEventListener("keydown", unlockAudio, { once: true });
@@ -292,7 +288,7 @@ function initAudioPlayer(): void {
 function unlockAudio(): void {
   if ((audioUnlocked && audioUnlocked2) || (!audioPlayer && !audioPlayer2)) return;
 
-  console.log("Autodarts Tools: Attempting to unlock audio");
+  console.log("Autodarts Tools: Sound FX: Attempting to unlock audio");
 
   const silentAudio = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
@@ -307,13 +303,13 @@ function unlockAudio(): void {
       audio.volume = 1;
       // Don't play them all, just load them
       if (i === 0) {
-        audio.play().catch(e => console.error("Autodarts Tools: Error unlocking pool audio", e));
+        audio.play().catch(e => console.error("Autodarts Tools: Sound FX: Error unlocking pool audio", e));
       }
     });
 
     audioPlayer.play()
       .then(() => {
-        console.log("Autodarts Tools: Audio unlocked successfully");
+        console.log("Autodarts Tools: Sound FX: Audio unlocked successfully");
         audioUnlocked = true;
         hideInteractionNotification();
 
@@ -323,7 +319,7 @@ function unlockAudio(): void {
         }
       })
       .catch((error) => {
-        console.error("Autodarts Tools: Failed to unlock audio", error);
+        console.error("Autodarts Tools: Sound FX: Failed to unlock audio", error);
       });
   }
 
@@ -338,13 +334,13 @@ function unlockAudio(): void {
       audio.volume = 1;
       // Don't play them all, just load them
       if (i === 0) {
-        audio.play().catch(e => console.error("Autodarts Tools: Error unlocking pool audio (channel 2)", e));
+        audio.play().catch(e => console.error("Autodarts Tools: Sound FX: Error unlocking pool audio (channel 2)", e));
       }
     });
 
     audioPlayer2.play()
       .then(() => {
-        console.log("Autodarts Tools: Audio channel 2 unlocked successfully");
+        console.log("Autodarts Tools: Sound FX: Audio channel 2 unlocked successfully");
         audioUnlocked2 = true;
         hideInteractionNotification();
 
@@ -354,7 +350,7 @@ function unlockAudio(): void {
         }
       })
       .catch((error) => {
-        console.error("Autodarts Tools: Failed to unlock audio channel 2", error);
+        console.error("Autodarts Tools: Sound FX: Failed to unlock audio channel 2", error);
       });
   }
 }
@@ -509,43 +505,34 @@ async function processGameDataFromTriggers(
 ): Promise<void> {
   if (!gameData.match || !gameData.match.turns?.length) return;
 
+  let triggers_list: string = "";
+  triggers.forEach((trigger) => {
+    triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+  });
+  console.log("Autodarts Tools: Sound FX: processing triggers", triggers_list);
+
   // Handle gameshot/matchshot cooldown
   const hasGameshot = triggers.some(t => t.trigger === "gameshot" || t.trigger === "matchshot");
   if (hasGameshot) {
     const now = Date.now();
     if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
-      console.log("Autodarts Tools: Skipping ambient gameshot/matchshot sound due to cooldown");
+      console.log("Autodarts Tools: Sound FX: Skipping gameshot/matchshot sound due to cooldown");
       return;
     }
     lastGameshotTimestamp = now;
   }
 
-  // Special handling for Gotcha variant
-  if (gameData.match.variant === "Gotcha") {
-    const currentScores = gameData.match.gameScores;
-    // This would need oldGameData for proper comparison, but since processor doesn't pass it,
-    // we'll skip this for now or could enhance processor to pass oldGameData if needed
-  }
-
-  // Play sounds for each trigger with ambient_ prefix
-  // SoundFx adds "ambient_" prefix to most triggers
-  for (const trigger of triggers) {
-    // For most triggers, add ambient_ prefix
-    if (trigger.category === "ambient" || trigger.category === "player" || trigger.category === "throw") {
-      playSound(`ambient_${trigger.trigger}`);
-    } else if (trigger.category === "match") {
-      playSound(`ambient_${trigger.trigger}`);
-    }
-  }
+  for (const trigger of triggers)
+    playSound(trigger.trigger)
 }
 
 /**
  * Play a sound based on the trigger
  * Adds the sound to a queue to be played sequentially
  */
-function playSound(trigger: string, soundChannel: number = 1): void {
+function playSound(trigger: string, soundChannel: number = 1): boolean {
   if (!config?.soundFx?.sounds || !config.soundFx.sounds.length) {
-    console.log("Autodarts Tools: No sounds configured");
+    console.log("Autodarts Tools: Sound FX: No sounds configured");
     return;
   }
 
@@ -557,17 +544,12 @@ function playSound(trigger: string, soundChannel: number = 1): void {
     if (sound.triggers.includes(trigger)) return true;
 
     // Validate range triggers of sound
-    // Extract number from trigger (handle ambient_ prefix)
+    // Extract number from trigger
     let triggerNum = Number(trigger);
-    if (Number.isNaN(triggerNum) && trigger.startsWith("ambient_")) {
-      triggerNum = Number(trigger.replace("ambient_", ""));
-    }
 
     if (!Number.isNaN(triggerNum)) {
       const rangeTriggers = sound.triggers.map((t: string) => {
-        // Check both with and without ambient_ prefix
-        const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
-        const match = triggerToCheck.match(triggerPatterns.ranges);
+        const match = t.match(triggerPatterns.ranges);
         if (!match) return null;
         return { min: Number(match[1]), max: Number(match[2]), original: t };
       }).filter(x => x !== null);
@@ -576,7 +558,7 @@ function playSound(trigger: string, soundChannel: number = 1): void {
         const { min, max, original } = rangeTrigger;
         const matches = triggerNum >= min && triggerNum <= max;
         if (matches) {
-          console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
+          console.log(`Autodarts Tools: Sound FX: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
         }
         return matches;
       });
@@ -587,660 +569,53 @@ function playSound(trigger: string, soundChannel: number = 1): void {
     return false;
   });
 
-  // If no direct match, try to find a fallback without the ambient_ prefix
-  if (!matchingSounds.length && trigger.startsWith("ambient_")) {
-    const withoutAmbientPrefix = trigger.replace("ambient_", "");
-    console.log(`Autodarts Tools: Trying fallback sound for "${trigger}" -> "${withoutAmbientPrefix}"`);
-
-    // Special case for t and d prefixes - first check for the direct number combination (e.g., t19, d20)
-    if ((withoutAmbientPrefix.startsWith("t") || withoutAmbientPrefix.startsWith("d"))
-        && withoutAmbientPrefix.length > 1 && /^\d+$/.test(withoutAmbientPrefix.substring(1))) {
-      const firstChar = withoutAmbientPrefix.charAt(0).toLowerCase();
-      const typeWord = firstChar === "t" ? "triple" : "double";
-      const number = withoutAmbientPrefix.substring(1);
-
-      // First try to find the direct combination (e.g., t19) without ambient prefix
-      const directNumberSounds = config.soundFx.sounds.filter(sound =>
-        sound.enabled && sound.triggers && sound.triggers.includes(withoutAmbientPrefix),
-      );
-
-      if (directNumberSounds.length) {
-        console.log(`Autodarts Tools: Found direct sound for ${withoutAmbientPrefix}`);
-        matchingSounds = directNumberSounds;
-      } else {
-        console.log(`Autodarts Tools: Special fallback - checking for ambient_${typeWord} and generic combinations`);
-
-        // Check for ambient_triple/ambient_double
-        const wordSounds = config.soundFx.sounds.filter(sound =>
-          sound.enabled && sound.triggers && sound.triggers.includes(`ambient_${typeWord}`),
-        );
-
-        if (wordSounds.length) {
-          console.log(`Autodarts Tools: Found ambient_${typeWord} for fallback`);
-
-          // Find matching number sounds
-          const numberSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && (
-              sound.triggers.includes(`ambient_${number}`)
-              || sound.triggers.includes(number)
-            ),
-          );
-
-          if (numberSounds.length) {
-            console.log(`Autodarts Tools: Using ambient_${typeWord} + number fallback chain`);
-            // Play the combined sounds
-            playTripleWithNumber(wordSounds, numberSounds);
-            return;
-          } else {
-            // Play just the word sound if no matching number sound
-            console.log(`Autodarts Tools: Using only ambient_${typeWord} fallback (no number sound found)`);
-
-            // Play the word fallback sound (triple/double)
-            const randomIndex = Math.floor(Math.random() * wordSounds.length);
-            const soundToPlay = wordSounds[randomIndex];
-
-            if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId || soundToPlay.tts) {
-              // Add to queue
-              if (soundChannel === 2) {
-                soundQueue2.push({
-                  url: soundToPlay.url,
-                  base64: soundToPlay.base64,
-                  soundId: soundToPlay.soundId,
-                  name: soundToPlay.name,
-                  tts: soundToPlay.tts,
-                });
-
-                // Start playing if not already playing
-                if (!isPlaying2) {
-                  playNextSound(2);
-                }
-              } else {
-                soundQueue.push({
-                  url: soundToPlay.url,
-                  base64: soundToPlay.base64,
-                  soundId: soundToPlay.soundId,
-                  name: soundToPlay.name,
-                  tts: soundToPlay.tts,
-                });
-
-                // Start playing if not already playing
-                if (!isPlaying) {
-                  playNextSound(1);
-                }
-              }
-              return; // Exit early since we've handled the sound
-            }
-          }
-        }
-
-        // Also check for non-ambient version (double/triple) if ambient version not found
-        const nonAmbientWordSounds = config.soundFx.sounds.filter(sound =>
-          sound.enabled && sound.triggers && sound.triggers.includes(typeWord),
-        );
-
-        if (nonAmbientWordSounds.length) {
-          console.log(`Autodarts Tools: Found non-ambient ${typeWord} for fallback`);
-
-          // Find matching number sounds
-          const numberSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes(number),
-          );
-
-          if (numberSounds.length) {
-            console.log(`Autodarts Tools: Using ${typeWord} + number fallback chain`);
-            // Play the combined sounds
-            playTripleWithNumber(nonAmbientWordSounds, numberSounds);
-            return;
-          } else {
-            // Play just the word sound if no matching number sound
-            console.log(`Autodarts Tools: Using only ${typeWord} fallback (no number sound found)`);
-
-            // Play the word fallback sound (triple/double)
-            const randomIndex = Math.floor(Math.random() * nonAmbientWordSounds.length);
-            const soundToPlay = nonAmbientWordSounds[randomIndex];
-
-            if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId || soundToPlay.tts) {
-              // Add to queue
-              if (soundChannel === 2) {
-                soundQueue2.push({
-                  url: soundToPlay.url,
-                  base64: soundToPlay.base64,
-                  soundId: soundToPlay.soundId,
-                  name: soundToPlay.name,
-                  tts: soundToPlay.tts,
-                });
-
-                // Start playing if not already playing
-                if (!isPlaying2) {
-                  playNextSound(2);
-                }
-              } else {
-                soundQueue.push({
-                  url: soundToPlay.url,
-                  base64: soundToPlay.base64,
-                  soundId: soundToPlay.soundId,
-                  name: soundToPlay.name,
-                  tts: soundToPlay.tts,
-                });
-
-                // Start playing if not already playing
-                if (!isPlaying) {
-                  playNextSound(1);
-                }
-              }
-              return; // Exit early since we've handled the sound
-            }
-          }
-        }
-      }
-    }
-
-    // Standard fallback to non-ambient version if we haven't found matches yet
-    if (!matchingSounds.length) {
-      matchingSounds = config.soundFx.sounds.filter((sound) => {
-        if (!sound.enabled || !sound.triggers) return false;
-
-        // Check for direct match
-        if (sound.triggers.includes(withoutAmbientPrefix)) return true;
-
-        // Validate range triggers of sound for numeric triggers
-        const triggerNum = Number(withoutAmbientPrefix);
-        if (!Number.isNaN(triggerNum)) {
-          const rangeTriggers = sound.triggers.map((t: string) => {
-            const match = t.match(triggerPatterns.ranges);
-            if (!match) return null;
-            return { min: Number(match[1]), max: Number(match[2]), original: t };
-          }).filter(x => x !== null);
-
-          const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
-            const { min, max, original } = rangeTrigger;
-            const matches = triggerNum >= min && triggerNum <= max;
-            if (matches) {
-              console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
-            }
-            return matches;
-          });
-
-          if (hasMatchingRange) return true;
-        }
-
-        return false;
-      });
-
-      if (matchingSounds.length) {
-        console.log(`Autodarts Tools: Using fallback sound for "${trigger}" -> "${withoutAmbientPrefix}"`);
-      }
-    }
-  }
-
-  // Continue with existing fallback logic for t, d, s prefixes, etc.
-  // If still no match, try to find a fallback only for s, d, or t prefixes
-  if (!matchingSounds.length && trigger.length > 1) {
-    // Handle both ambient_ prefixed and non-ambient prefixed triggers
-    const triggerWithoutAmbient = trigger.startsWith("ambient_")
-      ? trigger.replace("ambient_", "")
-      : trigger;
-
-    const firstChar = triggerWithoutAmbient.charAt(0).toLowerCase();
-
-    // Check for miss prefix (m) and fallback to "outside" or "cricket_miss" for Cricket
-    // But only if the trigger doesn't contain an underscore (to avoid combined throws)
-    if (firstChar === "m" && !triggerWithoutAmbient.includes("_")) {
-      const numberAfterM = Number.parseInt(triggerWithoutAmbient.substring(1));
-      if (!Number.isNaN(numberAfterM) && numberAfterM >= 1 && numberAfterM <= 20) {
-        // Try ambient_miss first (though we're already here because it wasn't found)
-        matchingSounds = config.soundFx.sounds.filter(sound =>
-          sound.enabled && sound.triggers && sound.triggers.includes("ambient_miss"),
-        );
-
-        // If no ambient_miss, try ambient_outside
-        if (!matchingSounds.length) {
-          matchingSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("ambient_outside"),
-          );
-
-          if (matchingSounds.length) {
-            console.log("Autodarts Tools: Using fallback sound \"ambient_outside\" for miss");
-          }
-        }
-
-        // If no ambient_outside, try miss
-        if (!matchingSounds.length) {
-          matchingSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("miss"),
-          );
-
-          if (matchingSounds.length) {
-            console.log("Autodarts Tools: Using fallback sound \"miss\"");
-          }
-        }
-
-        // If no miss, try outside as final fallback
-        if (!matchingSounds.length) {
-          matchingSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes("outside"),
-          );
-
-          if (matchingSounds.length) {
-            console.log("Autodarts Tools: Using final fallback sound \"outside\" for miss");
-          }
-        }
-      }
-    } else if (firstChar === "t") {
-      // For triple (t) prefix, try multiple fallbacks
-      const number = triggerWithoutAmbient.substring(1);
-
-      // Only proceed if the rest is a number
-      if (/^\d+$/.test(number)) {
-        console.log(`Autodarts Tools: Using fallback chain for "${trigger}"`);
-
-        // Complex fallback chain for triples
-        // Try ambient_triple first
-        let tripleSounds = config.soundFx.sounds.filter(sound =>
-          sound.enabled && sound.triggers && sound.triggers.includes("ambient_triple"),
-        );
-
-        let singleSounds: ISound[] = [];
-        let numberSounds: ISound[] = [];
-
-        // Check if we have ambient_s<number> and ambient_<number> sounds for second part
-        if (tripleSounds.length) {
-          singleSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes(`ambient_s${number}`),
-          );
-
-          if (singleSounds.length) {
-            console.log(`Autodarts Tools: Using "ambient_triple" + "ambient_s${number}" fallback`);
-            playTripleWithNumber(tripleSounds, singleSounds);
-            return;
-          }
-
-          numberSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes(`ambient_${number}`),
-          );
-
-          if (numberSounds.length) {
-            console.log(`Autodarts Tools: Using "ambient_triple" + "ambient_${number}" fallback`);
-            playTripleWithNumber(tripleSounds, numberSounds);
-            return;
-          }
-
-          // Even if no number sound found, play the triple sound alone
-          console.log("Autodarts Tools: Using \"ambient_triple\" alone (no number sound found)");
-          const randomTripleIndex = Math.floor(Math.random() * tripleSounds.length);
-          const tripleSoundToPlay = tripleSounds[randomTripleIndex];
-
-          if (tripleSoundToPlay.url || tripleSoundToPlay.base64 || tripleSoundToPlay.soundId || tripleSoundToPlay.tts) {
-            soundQueue.push({
-              url: tripleSoundToPlay.url,
-              base64: tripleSoundToPlay.base64,
-              soundId: tripleSoundToPlay.soundId,
-              name: tripleSoundToPlay.name,
-              tts: tripleSoundToPlay.tts,
-            });
-
-            // Start playing if not already playing
-            if (!isPlaying) {
-              playNextSound(1);
-            }
-            return;
-          }
-        }
-
-        // Try non-ambient "triple" if ambient version not found
-        tripleSounds = config.soundFx.sounds.filter(sound =>
-          sound.enabled && sound.triggers && sound.triggers.includes("triple"),
-        );
-
-        if (tripleSounds.length) {
-          singleSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes(`s${number}`),
-          );
-
-          if (singleSounds.length) {
-            console.log(`Autodarts Tools: Using "triple" + "s${number}" fallback`);
-            playTripleWithNumber(tripleSounds, singleSounds);
-            return;
-          }
-
-          numberSounds = config.soundFx.sounds.filter(sound =>
-            sound.enabled && sound.triggers && sound.triggers.includes(number),
-          );
-
-          if (numberSounds.length) {
-            console.log(`Autodarts Tools: Using "triple" + "${number}" fallback`);
-            playTripleWithNumber(tripleSounds, numberSounds);
-            return;
-          }
-
-          // Even if no number sound found, play the triple sound alone
-          console.log("Autodarts Tools: Using \"triple\" alone (no number sound found)");
-          const randomTripleIndex = Math.floor(Math.random() * tripleSounds.length);
-          const tripleSoundToPlay = tripleSounds[randomTripleIndex];
-
-          if (tripleSoundToPlay.url || tripleSoundToPlay.base64 || tripleSoundToPlay.soundId || tripleSoundToPlay.tts) {
-            soundQueue.push({
-              url: tripleSoundToPlay.url,
-              base64: tripleSoundToPlay.base64,
-              soundId: tripleSoundToPlay.soundId,
-              name: tripleSoundToPlay.name,
-              tts: tripleSoundToPlay.tts,
-            });
-
-            // Start playing if not already playing
-            if (!isPlaying) {
-              playNextSound(1);
-            }
-            return;
-          }
-        }
-
-        // No fallback to just the number - removing this as it's not intended behavior
-        console.log("Autodarts Tools: No triple sound combinations found, not falling back to number");
-      }
-    }
-    // Rest of the original fallback logic...
-  }
-
-  // Special case: fallback from "miss" to "outside" or "cricket_miss" for Cricket
-  if (!matchingSounds.length && trigger.toLowerCase() === "ambient_miss") {
-    // For Cricket variant, check for cricket_miss sound first
-    matchingSounds = config.soundFx.sounds.filter(sound =>
-      sound.enabled && sound.triggers && (
-        sound.triggers.includes("ambient_cricket_miss")
-        || sound.triggers.includes("cricket_miss")
-      ),
-    );
-
-    if (matchingSounds.length) {
-      console.log("Autodarts Tools: Using Cricket-specific fallback sound \"cricket_miss\"");
-    } else {
-      // Fall back to outside if cricket_miss not found
-      matchingSounds = config.soundFx.sounds.filter(sound =>
-        sound.enabled && sound.triggers && (
-          sound.triggers.includes("ambient_outside")
-          || sound.triggers.includes("outside")
-        ),
-      );
-
-      if (matchingSounds.length) {
-        console.log("Autodarts Tools: Using fallback sound for \"ambient_miss\" -> \"ambient_outside\" or \"outside\"");
-      }
-    }
-  }
-
-  // Special case: fallback from singles (ambient_s#) to number (ambient_#)
-  if (!matchingSounds.length && trigger.toLowerCase().startsWith("ambient_s") && /^\d+$/.test(trigger.substring(9))) {
-    const number = trigger.substring(9);
-    console.log(`Autodarts Tools: Trying fallback from "${trigger}" to "ambient_${number}"`);
-
-    matchingSounds = config.soundFx.sounds.filter((sound) => {
-      if (!sound.enabled || !sound.triggers) return false;
-
-      // Check for direct match
-      if (sound.triggers.includes(`ambient_${number}`)) return true;
-
-      // Validate range triggers
-      const triggerNum = Number(number);
-      if (!Number.isNaN(triggerNum)) {
-        const rangeTriggers = sound.triggers.map((t: string) => {
-          // Check both with and without ambient_ prefix
-          const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
-          const match = triggerToCheck.match(triggerPatterns.ranges);
-          if (!match) return null;
-          return { min: Number(match[1]), max: Number(match[2]), original: t };
-        }).filter(x => x !== null);
-
-        const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
-          const { min, max, original } = rangeTrigger;
-          const matches = triggerNum >= min && triggerNum <= max;
-          if (matches) {
-            console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
-          }
-          return matches;
-        });
-
-        if (hasMatchingRange) return true;
-      }
-
-      return false;
-    });
-
-    if (matchingSounds.length) {
-      console.log(`Autodarts Tools: Using fallback sound for "${trigger}" -> "ambient_${number}"`);
-    } else {
-      // Try without ambient prefix
-      matchingSounds = config.soundFx.sounds.filter((sound) => {
-        if (!sound.enabled || !sound.triggers) return false;
-
-        // Check for direct match
-        if (sound.triggers.includes(number)) return true;
-
-        // Validate range triggers
-        const triggerNum = Number(number);
-        if (!Number.isNaN(triggerNum)) {
-          const rangeTriggers = sound.triggers.map((t: string) => {
-            // Check both with and without ambient_ prefix
-            const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
-            const match = triggerToCheck.match(triggerPatterns.ranges);
-            if (!match) return null;
-            return { min: Number(match[1]), max: Number(match[2]), original: t };
-          }).filter(x => x !== null);
-
-          const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
-            const { min, max, original } = rangeTrigger;
-            const matches = triggerNum >= min && triggerNum <= max;
-            if (matches) {
-              console.log(`Autodarts Tools: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
-            }
-            return matches;
-          });
-
-          if (hasMatchingRange) return true;
-        }
-
-        return false;
-      });
-
-      if (matchingSounds.length) {
-        console.log(`Autodarts Tools: Using fallback sound for "${trigger}" -> "${number}"`);
-      }
-    }
-  }
-
-  // Final check: if trigger is a number (with or without ambient_ prefix), check range triggers
   if (!matchingSounds.length) {
-    // Extract number from trigger (handle ambient_ prefix)
-    let triggerNum = Number(trigger);
-    if (Number.isNaN(triggerNum) && trigger.startsWith("ambient_")) {
-      triggerNum = Number(trigger.replace("ambient_", ""));
-    }
-
-    if (!Number.isNaN(triggerNum)) {
-      const rangeTriggers = config.soundFx.sounds.filter((sound) => {
-        if (!sound.enabled || !sound.triggers) return false;
-
-        return sound.triggers.some((t: string) => {
-          // Check both with and without ambient_ prefix
-          const triggerToCheck = t.startsWith("ambient_") ? t.replace("ambient_", "") : t;
-          const match = triggerToCheck.match(triggerPatterns.ranges);
-          if (!match) return false;
-          const min = Number(match[1]);
-          const max = Number(match[2]);
-          const matches = triggerNum >= min && triggerNum <= max;
-          if (matches) {
-            console.log(`Autodarts Tools: Range trigger "${t}" matches ${triggerNum} (range: ${min}-${max})`);
-          }
-          return matches;
-        });
-      });
-
-      if (rangeTriggers.length) {
-        console.log(`Autodarts Tools: Found range trigger match for "${trigger}" (value: ${triggerNum})`);
-        matchingSounds = rangeTriggers;
-      }
-    }
+    console.log(`Autodarts Tools: Sound FX: No sound found for trigger "${trigger}" (channel ${soundChannel})`);
+    return false;
   }
 
-  // Special case: fallback from "ambient_matchshot" to "ambient_gameshot"
-  if (!matchingSounds.length && trigger.toLowerCase() === "ambient_matchshot") {
-    matchingSounds = config.soundFx.sounds.filter(sound =>
-      sound.enabled && sound.triggers && (
-        sound.triggers.includes("ambient_gameshot")
-        || sound.triggers.includes("gameshot")
-      ),
-    );
+  // we found matching sounds
+  // If multiple sounds match the trigger, pick a random one
+  const randomIndex = Math.floor(Math.random() * matchingSounds.length);
+  const soundToPlay = matchingSounds[randomIndex];
 
-    if (matchingSounds.length) {
-      console.log("Autodarts Tools: Using fallback sound for \"ambient_matchshot\" -> \"ambient_gameshot\" or \"gameshot\"");
-    }
-  }
+  console.log(`Autodarts Tools: Sound FX: Found matching sound ${soundToPlay.name} (channel ${soundChannel})`);
 
-  // Helper function to play a triple/double sound followed by a number sound
-  function playTripleWithNumber(wordSounds: ISound[], numberSounds: ISound[]) {
-    // Play the word fallback sound (triple/double)
-    const randomWordIndex = Math.floor(Math.random() * wordSounds.length);
-    const wordSoundToPlay = wordSounds[randomWordIndex];
+  // Check if there's a soundId that we need to load from IndexedDB
+  if (soundToPlay.soundId && isIndexedDBAvailable()) {
+    console.log(`Autodarts Tools: Sound FX: Loading sound from IndexedDB ${soundToPlay.soundId} (channel ${soundChannel})`);
 
-    // Add word to queue
-    if (wordSoundToPlay.url || wordSoundToPlay.base64 || wordSoundToPlay.soundId || wordSoundToPlay.tts) {
-      if (soundChannel === 2) {
-        soundQueue2.push({
-          url: wordSoundToPlay.url,
-          base64: wordSoundToPlay.base64,
-          soundId: wordSoundToPlay.soundId,
-          name: wordSoundToPlay.name,
-          tts: wordSoundToPlay.tts,
-        });
+    // Get the sound from IndexedDB and play it
+    getSoundFxFromIndexedDB(soundToPlay.soundId)
+      .then((base64) => {
+        if (base64) {
+          console.log(`Autodarts Tools: Sound FX: Successfully loaded sound from IndexedDB (channel ${soundChannel})`);
+          // Add to queue
+          if (soundChannel === 2) {
+            soundQueue2.push({
+              url: soundToPlay.url,
+              base64,
+              name: soundToPlay.name,
+            });
 
-        // Add number to queue
-        const randomNumberIndex = Math.floor(Math.random() * numberSounds.length);
-        const numberSoundToPlay = numberSounds[randomNumberIndex];
-
-        if (numberSoundToPlay.url || numberSoundToPlay.base64 || numberSoundToPlay.soundId || numberSoundToPlay.tts) {
-          soundQueue2.push({
-            url: numberSoundToPlay.url,
-            base64: numberSoundToPlay.base64,
-            soundId: numberSoundToPlay.soundId,
-            name: numberSoundToPlay.name,
-            tts: numberSoundToPlay.tts,
-          });
-          console.log("Autodarts Tools: Added number sound to queue (channel 2)");
-        } else {
-          console.log("Autodarts Tools: Number sound has no playable source");
-        }
-
-        // Start playing if not already playing
-        if (!isPlaying2) {
-          playNextSound(2);
-        }
-      } else {
-        soundQueue.push({
-          url: wordSoundToPlay.url,
-          base64: wordSoundToPlay.base64,
-          soundId: wordSoundToPlay.soundId,
-          name: wordSoundToPlay.name,
-          tts: wordSoundToPlay.tts,
-        });
-
-        // Add number to queue
-        const randomNumberIndex = Math.floor(Math.random() * numberSounds.length);
-        const numberSoundToPlay = numberSounds[randomNumberIndex];
-
-        if (numberSoundToPlay.url || numberSoundToPlay.base64 || numberSoundToPlay.soundId || numberSoundToPlay.tts) {
-          soundQueue.push({
-            url: numberSoundToPlay.url,
-            base64: numberSoundToPlay.base64,
-            soundId: numberSoundToPlay.soundId,
-            name: numberSoundToPlay.name,
-            tts: numberSoundToPlay.tts,
-          });
-          console.log("Autodarts Tools: Added number sound to queue");
-        } else {
-          console.log("Autodarts Tools: Number sound has no playable source");
-        }
-
-        // Start playing if not already playing
-        if (!isPlaying) {
-          playNextSound(1);
-        }
-      }
-    }
-  }
-
-  // If we found matching sounds
-  if (matchingSounds.length) {
-    // If multiple sounds match the trigger, pick a random one
-    const randomIndex = Math.floor(Math.random() * matchingSounds.length);
-    const soundToPlay = matchingSounds[randomIndex];
-
-    console.log(`Autodarts Tools: Found matching sound ${soundToPlay.name} (channel ${soundChannel})`);
-
-    // Check if there's a soundId that we need to load from IndexedDB
-    if (soundToPlay.soundId && isIndexedDBAvailable()) {
-      console.log(`Autodarts Tools: Loading sound from IndexedDB ${soundToPlay.soundId} (channel ${soundChannel})`);
-
-      // Get the sound from IndexedDB and play it
-      getSoundFxFromIndexedDB(soundToPlay.soundId)
-        .then((base64) => {
-          if (base64) {
-            console.log(`Autodarts Tools: Successfully loaded sound from IndexedDB (channel ${soundChannel})`);
-            // Add to queue
-            if (soundChannel === 2) {
-              soundQueue2.push({
-                url: soundToPlay.url,
-                base64,
-                name: soundToPlay.name,
-              });
-
-              // Start playing if not already playing
-              if (!isPlaying2) {
-                playNextSound(2);
-              }
-            } else {
-              soundQueue.push({
-                url: soundToPlay.url,
-                base64,
-                name: soundToPlay.name,
-              });
-
-              // Start playing if not already playing
-              if (!isPlaying) {
-                playNextSound(1);
-              }
+            // Start playing if not already playing
+            if (!isPlaying2) {
+              playNextSound(2);
             }
           } else {
-            console.error("Autodarts Tools: Failed to load sound from IndexedDB");
-            // Fall back to URL if available
-            if (soundToPlay.url) {
-              if (soundChannel === 2) {
-                soundQueue2.push({
-                  url: soundToPlay.url,
-                  base64: undefined,
-                  name: soundToPlay.name,
-                });
+            soundQueue.push({
+              url: soundToPlay.url,
+              base64,
+              name: soundToPlay.name,
+            });
 
-                // Start playing if not already playing
-                if (!isPlaying2) {
-                  playNextSound(2);
-                }
-              } else {
-                soundQueue.push({
-                  url: soundToPlay.url,
-                  base64: undefined,
-                  name: soundToPlay.name,
-                });
-
-                // Start playing if not already playing
-                if (!isPlaying) {
-                  playNextSound(1);
-                }
-              }
+            // Start playing if not already playing
+            if (!isPlaying) {
+              playNextSound(1);
             }
           }
-        })
-        .catch((error) => {
-          console.error("Autodarts Tools: Error loading sound from IndexedDB", error);
+        } else {
+          console.error("Autodarts Tools: Sound FX: Failed to load sound from IndexedDB");
           // Fall back to URL if available
           if (soundToPlay.url) {
             if (soundChannel === 2) {
@@ -1267,41 +642,70 @@ function playSound(trigger: string, soundChannel: number = 1): void {
               }
             }
           }
+        }
+      })
+      .catch((error) => {
+        console.error("Autodarts Tools: Sound FX: Error loading sound from IndexedDB", error);
+        // Fall back to URL if available
+        if (soundToPlay.url) {
+          if (soundChannel === 2) {
+            soundQueue2.push({
+              url: soundToPlay.url,
+              base64: undefined,
+              name: soundToPlay.name,
+            });
+
+            // Start playing if not already playing
+            if (!isPlaying2) {
+              playNextSound(2);
+            }
+          } else {
+            soundQueue.push({
+              url: soundToPlay.url,
+              base64: undefined,
+              name: soundToPlay.name,
+            });
+
+            // Start playing if not already playing
+            if (!isPlaying) {
+              playNextSound(1);
+            }
+          }
+        }
+      });
+  } else {
+    // Use URL, base64, or TTS directly from the sound object
+    // Add to queue
+    if (soundToPlay.url || soundToPlay.base64 || soundToPlay.tts) {
+      if (soundChannel === 2) {
+        soundQueue2.push({
+          url: soundToPlay.url,
+          base64: soundToPlay.base64,
+          name: soundToPlay.name,
+          tts: soundToPlay.tts,
         });
-    } else {
-      // Use URL, base64, or TTS directly from the sound object
-      // Add to queue
-      if (soundToPlay.url || soundToPlay.base64 || soundToPlay.tts) {
-        if (soundChannel === 2) {
-          soundQueue2.push({
-            url: soundToPlay.url,
-            base64: soundToPlay.base64,
-            name: soundToPlay.name,
-            tts: soundToPlay.tts,
-          });
 
-          // Start playing if not already playing
-          if (!isPlaying2) {
-            playNextSound(2);
-          }
-        } else {
-          soundQueue.push({
-            url: soundToPlay.url,
-            base64: soundToPlay.base64,
-            name: soundToPlay.name,
-            tts: soundToPlay.tts,
-          });
+        // Start playing if not already playing
+        if (!isPlaying2) {
+          playNextSound(2);
+        }
+      } else {
+        soundQueue.push({
+          url: soundToPlay.url,
+          base64: soundToPlay.base64,
+          name: soundToPlay.name,
+          tts: soundToPlay.tts,
+        });
 
-          // Start playing if not already playing
-          if (!isPlaying) {
-            playNextSound(1);
-          }
+        // Start playing if not already playing
+        if (!isPlaying) {
+          playNextSound(1);
         }
       }
     }
-  } else {
-    console.log(`Autodarts Tools: No sound found for trigger "${trigger}" (channel ${soundChannel})`);
   }
+
+  return true;
 }
 
 /**
@@ -1312,7 +716,7 @@ function playSound(trigger: string, soundChannel: number = 1): void {
  */
 function playTTSSound(tts: ISoundTTS, channel: number): void {
   if (!window.speechSynthesis) {
-    console.error("Autodarts Tools: speechSynthesis not available");
+    console.error("Autodarts Tools: Sound FX: speechSynthesis not available");
     playNextSound(channel);
     return;
   }
@@ -1333,19 +737,19 @@ function playTTSSound(tts: ISoundTTS, channel: number): void {
 
   // Safety timeout for iOS (10 seconds)
   const safetyTimeout = setTimeout(() => {
-    console.warn("Autodarts Tools: TTS safety timeout reached");
+    console.warn("Autodarts Tools: Sound FX: TTS safety timeout reached");
     speechSynthesis.cancel();
     playNextSound(channel);
   }, 10000);
 
   utterance.onend = () => {
     clearTimeout(safetyTimeout);
-    console.log("Autodarts Tools: TTS playback ended");
+    console.log("Autodarts Tools: Sound FX: TTS playback ended");
     playNextSound(channel);
   };
   utterance.onerror = (e) => {
     clearTimeout(safetyTimeout);
-    console.error("Autodarts Tools: TTS playback error", e);
+    console.error("Autodarts Tools: Sound FX: TTS playback error", e);
     playNextSound(channel);
   };
 
@@ -1354,10 +758,10 @@ function playTTSSound(tts: ISoundTTS, channel: number): void {
 
 function playNextSound(channel: number = 1): void {
   if (channel === 2) {
-    console.log("Autodarts Tools: playNextSound called for channel 2, queue length:", soundQueue2.length);
+    console.log("Autodarts Tools: Sound FX: playNextSound called for channel 2, queue length:", soundQueue2.length);
 
     if (soundQueue2.length === 0) {
-      console.log("Autodarts Tools: Sound queue for channel 2 is empty");
+      console.log("Autodarts Tools: Sound FX: Sound queue for channel 2 is empty");
       isPlaying2 = false;
       return;
     }
@@ -1365,16 +769,16 @@ function playNextSound(channel: number = 1): void {
     isPlaying2 = true;
     const nextSound = soundQueue2.shift();
 
-    console.log("Autodarts Tools: Next sound to play on channel 2:", nextSound?.name);
+    console.log("Autodarts Tools: Sound FX: Next sound to play on channel 2:", nextSound?.name);
 
     if (!nextSound) {
-      console.error("Autodarts Tools: nextSound for channel 2 is unexpectedly empty even though queue had items");
+      console.error("Autodarts Tools: Sound FX: nextSound for channel 2 is unexpectedly empty even though queue had items");
       isPlaying2 = false;
       return;
     }
 
     if (!nextSound.url && !nextSound.base64 && !nextSound.soundId && !nextSound.tts) {
-      console.error("Autodarts Tools: Sound for channel 2 has neither URL, base64 data, soundId, nor TTS");
+      console.error("Autodarts Tools: Sound FX: Sound for channel 2 has neither URL, base64 data, soundId, nor TTS");
       // Move to next sound
       playNextSound(2);
       return;
@@ -1386,7 +790,7 @@ function playNextSound(channel: number = 1): void {
       return;
     }
 
-    console.log("Autodarts Tools: Playing sound on channel 2");
+    console.log("Autodarts Tools: Sound FX: Playing sound on channel 2");
 
     try {
       // Get the next audio element from the pool
@@ -1394,7 +798,7 @@ function playNextSound(channel: number = 1): void {
 
       // Make sure the audio element exists
       if (!audioElement) {
-        console.error("Autodarts Tools: Audio element not found in pool for channel 2");
+        console.error("Autodarts Tools: Sound FX: Audio element not found in pool for channel 2");
         isPlaying2 = false;
         return;
       }
@@ -1408,15 +812,15 @@ function playNextSound(channel: number = 1): void {
       // Play based on available source (URL, IndexedDB, or base64)
       playWithAvailableSource(nextSound, audioElement, 2);
     } catch (error) {
-      console.error("Autodarts Tools: Exception while setting up audio for channel 2", error);
+      console.error("Autodarts Tools: Sound FX: Exception while setting up audio for channel 2", error);
       // Move to next sound on error
       playNextSound(2);
     }
   } else {
-    console.log("Autodarts Tools: playNextSound called for channel 1, queue length:", soundQueue.length);
+    console.log("Autodarts Tools: Sound FX: playNextSound called for channel 1, queue length:", soundQueue.length);
 
     if (soundQueue.length === 0) {
-      console.log("Autodarts Tools: Sound queue for channel 1 is empty");
+      console.log("Autodarts Tools: Sound FX: Sound queue for channel 1 is empty");
       isPlaying = false;
       return;
     }
@@ -1424,16 +828,16 @@ function playNextSound(channel: number = 1): void {
     isPlaying = true;
     const nextSound = soundQueue.shift();
 
-    console.log("Autodarts Tools: Next sound to play on channel 1:", nextSound?.name);
+    console.log("Autodarts Tools: Sound FX: Next sound to play on channel 1:", nextSound?.name);
 
     if (!nextSound) {
-      console.error("Autodarts Tools: nextSound for channel 1 is unexpectedly empty even though queue had items");
+      console.error("Autodarts Tools: Sound FX: nextSound for channel 1 is unexpectedly empty even though queue had items");
       isPlaying = false;
       return;
     }
 
     if (!nextSound.url && !nextSound.base64 && !nextSound.soundId && !nextSound.tts) {
-      console.error("Autodarts Tools: Sound for channel 1 has neither URL, base64 data, soundId, nor TTS");
+      console.error("Autodarts Tools: Sound FX: Sound for channel 1 has neither URL, base64 data, soundId, nor TTS");
       // Move to next sound
       playNextSound(1);
       return;
@@ -1445,7 +849,7 @@ function playNextSound(channel: number = 1): void {
       return;
     }
 
-    console.log("Autodarts Tools: Playing sound on channel 1");
+    console.log("Autodarts Tools: Sound FX: Playing sound on channel 1");
 
     try {
       // Get the next audio element from the pool
@@ -1453,7 +857,7 @@ function playNextSound(channel: number = 1): void {
 
       // Make sure the audio element exists
       if (!audioElement) {
-        console.error("Autodarts Tools: Audio element not found in pool for channel 1");
+        console.error("Autodarts Tools: Sound FX: Audio element not found in pool for channel 1");
         isPlaying = false;
         return;
       }
@@ -1467,7 +871,7 @@ function playNextSound(channel: number = 1): void {
       // Play based on available source (URL, IndexedDB, or base64)
       playWithAvailableSource(nextSound, audioElement, 1);
     } catch (error) {
-      console.error("Autodarts Tools: Exception while setting up audio for channel 1", error);
+      console.error("Autodarts Tools: Sound FX: Exception while setting up audio for channel 1", error);
       // Move to next sound on error
       playNextSound(1);
     }
@@ -1482,7 +886,7 @@ function playWithAvailableSource(
 ): void {
   // Try URL first, then soundId (from IndexedDB), then base64
   if (nextSound.url) {
-    console.log(`Autodarts Tools: Using URL source (channel ${channel})`);
+    console.log(`Autodarts Tools: Sound FX: Using URL source (channel ${channel})`);
 
     // Set the source to the URL
     audioElement.src = nextSound.url;
@@ -1490,10 +894,10 @@ function playWithAvailableSource(
     // Play the sound
     audioElement.play()
       .then(() => {
-        console.log(`Autodarts Tools: URL sound playing successfully (channel ${channel})`);
+        console.log(`Autodarts Tools: Sound FX: URL sound playing successfully (channel ${channel})`);
       })
       .catch((error) => {
-        console.error(`Autodarts Tools: Error playing URL sound (channel ${channel})`, error);
+        console.error(`Autodarts Tools: Sound FX: Error playing URL sound (channel ${channel})`, error);
 
         // Check if the error is due to user interaction requirement
         if (
@@ -1507,15 +911,15 @@ function playWithAvailableSource(
 
         // If URL fails and we have soundId or base64, try that as fallback
         if (nextSound.soundId && isIndexedDBAvailable()) {
-          console.log(`Autodarts Tools: Falling back to soundId after URL failure (channel ${channel})`);
+          console.log(`Autodarts Tools: Sound FX: Falling back to soundId after URL failure (channel ${channel})`);
           // Get the sound from IndexedDB and play it
           getSoundFxFromIndexedDB(nextSound.soundId)
             .then((base64) => {
               if (base64) {
-                console.log(`Autodarts Tools: Successfully loaded sound from IndexedDB (channel ${channel})`);
+                console.log(`Autodarts Tools: Sound FX: Successfully loaded sound from IndexedDB (channel ${channel})`);
                 playBase64Sound(base64, channel);
               } else {
-                console.error(`Autodarts Tools: Failed to load sound from IndexedDB (channel ${channel})`);
+                console.error(`Autodarts Tools: Sound FX: Failed to load sound from IndexedDB (channel ${channel})`);
                 // Try base64 if available as final fallback
                 if (nextSound.base64) {
                   playBase64Sound(nextSound.base64, channel);
@@ -1526,7 +930,7 @@ function playWithAvailableSource(
               }
             })
             .catch((error) => {
-              console.error(`Autodarts Tools: Error loading sound from IndexedDB (channel ${channel})`, error);
+              console.error(`Autodarts Tools: Sound FX: Error loading sound from IndexedDB (channel ${channel})`, error);
               // Try base64 if available as final fallback
               if (nextSound.base64) {
                 playBase64Sound(nextSound.base64, channel);
@@ -1536,7 +940,7 @@ function playWithAvailableSource(
               }
             });
         } else if (nextSound.base64) {
-          console.log(`Autodarts Tools: Falling back to base64 after URL failure (channel ${channel})`);
+          console.log(`Autodarts Tools: Sound FX: Falling back to base64 after URL failure (channel ${channel})`);
           playBase64Sound(nextSound.base64, channel);
         } else {
           // Move to next sound
@@ -1544,15 +948,15 @@ function playWithAvailableSource(
         }
       });
   } else if (nextSound.soundId && isIndexedDBAvailable()) {
-    console.log(`Autodarts Tools: Using soundId source (channel ${channel})`);
+    console.log(`Autodarts Tools: Sound FX: Using soundId source (channel ${channel})`);
     // Get the sound from IndexedDB and play it
     getSoundFxFromIndexedDB(nextSound.soundId)
       .then((base64) => {
         if (base64) {
-          console.log(`Autodarts Tools: Successfully loaded sound from IndexedDB (channel ${channel})`);
+          console.log(`Autodarts Tools: Sound FX: Successfully loaded sound from IndexedDB (channel ${channel})`);
           playBase64Sound(base64, channel);
         } else {
-          console.error(`Autodarts Tools: Failed to load sound from IndexedDB (channel ${channel})`);
+          console.error(`Autodarts Tools: Sound FX: Failed to load sound from IndexedDB (channel ${channel})`);
           // Fall back to base64 if available
           if (nextSound.base64) {
             playBase64Sound(nextSound.base64, channel);
@@ -1563,7 +967,7 @@ function playWithAvailableSource(
         }
       })
       .catch((error) => {
-        console.error(`Autodarts Tools: Error loading sound from IndexedDB (channel ${channel})`, error);
+        console.error(`Autodarts Tools: Sound FX: Error loading sound from IndexedDB (channel ${channel})`, error);
         // Fall back to base64 if available
         if (nextSound.base64) {
           playBase64Sound(nextSound.base64, channel);
@@ -1575,7 +979,7 @@ function playWithAvailableSource(
   } else if (nextSound.base64) { // If no URL or soundId, try base64
     playBase64Sound(nextSound.base64, channel);
   } else {
-    console.error(`Autodarts Tools: Sound has neither URL, soundId, nor base64 data (channel ${channel})`);
+    console.error(`Autodarts Tools: Sound FX: Sound has neither URL, soundId, nor base64 data (channel ${channel})`);
     // Move to next sound
     playNextSound(channel);
   }
@@ -1585,14 +989,14 @@ function playWithAvailableSource(
  * Play a sound from base64 data
  */
 function playBase64Sound(base64Data: string, channel: number = 1): void {
-  console.log(`Autodarts Tools: Using base64 source (channel ${channel})`);
+  console.log(`Autodarts Tools: Sound FX: Using base64 source (channel ${channel})`);
 
   try {
     // Create a blob URL from the base64 data
     const audioUrl = createAudioBlobUrl(base64Data);
 
     if (!audioUrl) {
-      console.error(`Autodarts Tools: Failed to create audio blob URL (channel ${channel})`);
+      console.error(`Autodarts Tools: Sound FX: Failed to create audio blob URL (channel ${channel})`);
       playNextSound(channel);
       return;
     }
@@ -1605,7 +1009,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
 
     // Make sure the audio element exists
     if (!audioElement) {
-      console.error(`Autodarts Tools: Audio element not found in pool for base64 (channel ${channel})`);
+      console.error(`Autodarts Tools: Sound FX: Audio element not found in pool for base64 (channel ${channel})`);
       URL.revokeObjectURL(audioUrl);
       const index = blobUrlsToRevoke.indexOf(audioUrl);
       if (index > -1) {
@@ -1631,10 +1035,10 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
     // Play the sound
     audioElement.play()
       .then(() => {
-        console.log(`Autodarts Tools: Base64 sound playing successfully (channel ${channel})`);
+        console.log(`Autodarts Tools: Sound FX: Base64 sound playing successfully (channel ${channel})`);
       })
       .catch((error) => {
-        console.error(`Autodarts Tools: Base64 sound playback failed (channel ${channel})`, error);
+        console.error(`Autodarts Tools: Sound FX: Base64 sound playback failed (channel ${channel})`, error);
 
         // Check if error is due to user interaction requirement
         if (
@@ -1654,7 +1058,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
         playNextSound(channel);
       });
   } catch (error) {
-    console.error(`Autodarts Tools: Error processing base64 data (channel ${channel})`, error);
+    console.error(`Autodarts Tools: Sound FX: Error processing base64 data (channel ${channel})`, error);
     playNextSound(channel);
   }
 }
@@ -1674,7 +1078,7 @@ function createAudioBlobUrl(base64Data: string): string | null {
       if (commaIndex !== -1) {
         rawBase64 = base64Data.substring(commaIndex + 1);
       } else {
-        console.error("Autodarts Tools: Invalid data URL format");
+        console.error("Autodarts Tools: Sound FX: Invalid data URL format");
         return null;
       }
     }
@@ -1696,10 +1100,10 @@ function createAudioBlobUrl(base64Data: string): string | null {
     try {
       binaryString = window.atob(rawBase64);
     } catch (e) {
-      console.error("Autodarts Tools: Base64 decoding failed", e);
+      console.error("Autodarts Tools: Sound FX: Base64 decoding failed", e);
 
       // Log a sample of the problematic string to help with debugging
-      console.error("Autodarts Tools: Problem with base64 string:",
+      console.error("Autodarts Tools: Sound FX: Problem with base64 string:",
         rawBase64.length > 50 ? `${rawBase64.substring(0, 50)}...` : rawBase64);
 
       return null;
@@ -1721,10 +1125,10 @@ function createAudioBlobUrl(base64Data: string): string | null {
       }
     }
 
-    const blob = new Blob([ bytes ], { type: mimeType });
+    const blob = new Blob([bytes], { type: mimeType });
     return URL.createObjectURL(blob);
   } catch (error) {
-    console.error("Autodarts Tools: Failed to create blob URL", error);
+    console.error("Autodarts Tools: Sound FX: Failed to create blob URL", error);
     return null;
   }
 }
@@ -1732,7 +1136,7 @@ function createAudioBlobUrl(base64Data: string): string | null {
 // Clean up blob URLs periodically to prevent memory leaks
 setInterval(() => {
   if (blobUrlsToRevoke.length > 20) {
-    console.log("Autodarts Tools: Cleaning up blob URLs", blobUrlsToRevoke.length);
+    console.log("Autodarts Tools: Sound FX: Cleaning up blob URLs", blobUrlsToRevoke.length);
     // Keep the 5 most recent URLs (they might still be in use)
     const urlsToKeep = blobUrlsToRevoke.slice(-5);
     const urlsToRemove = blobUrlsToRevoke.slice(0, -5);
@@ -1741,7 +1145,7 @@ setInterval(() => {
       try {
         URL.revokeObjectURL(url);
       } catch (e) {
-        console.error("Autodarts Tools: Error revoking URL", e);
+        console.error("Autodarts Tools: Sound FX: Error revoking URL", e);
       }
     });
 
@@ -1754,7 +1158,7 @@ setInterval(() => {
  * Stops all currently playing sounds and clears the sound queue
  */
 function stopAllSounds(): void {
-  console.log("Autodarts Tools: Stopping all sounds due to edit mode");
+  console.log("Autodarts Tools: Sound FX: Stopping all sounds due to edit mode");
 
   // Clear the sound queues
   soundQueue.length = 0;

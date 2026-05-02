@@ -1,22 +1,13 @@
 <template>
-  <div
-    @click="hideAnimation"
-    v-if="isShowingAnimation"
-    class="fixed z-[180]"
-    :class="animationContainerClasses"
-    :style="animationContainerStyle"
-  >
+  <div @click="hideAnimation" v-if="isShowingAnimation" class="fixed z-[180]"
+    :class="animationContainerClasses" :style="animationContainerStyle">
     <div class="absolute inset-0">
-      <img
-        id="gif-animation"
-        :src="currentAnimationUrl"
-        :class="twMerge(
-          `size-full transition-opacity duration-300`,
-          isFadingIn ? 'opacity-100' : 'opacity-0',
-          isFadingOut ? 'opacity-0' : '',
-          config?.animations?.objectFit === 'contain' ? 'object-contain' : 'object-cover',
-        )"
-      >
+      <img id="gif-animation" :src="currentAnimationUrl" :class="twMerge(
+        `size-full transition-opacity duration-300`,
+        isFadingIn ? 'opacity-100' : 'opacity-0',
+        isFadingOut ? 'opacity-0' : '',
+        config?.animations?.objectFit === 'contain' ? 'object-contain' : 'object-cover',
+      )">
     </div>
   </div>
 </template>
@@ -29,8 +20,8 @@ import type { IGameData } from "@/utils/game-data-storage";
 import { getAnimationFromOPFS, isOPFSAvailable, triggerPatterns } from "@/utils/helpers";
 import { AutodartsToolsConfig, type IAnimation } from "@/utils/storage";
 import {
-  useGameDataProcessor,
-  initGameDataProcessor,
+  registerGameDataCallback,
+  unregisterGameDataCallback,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 
@@ -39,6 +30,7 @@ const FADE_DURATION = 300; // ms
 const FADE_IN_DELAY = 50; // ms
 
 let updateInterval: NodeJS.Timeout | null = null;
+let gameDataProcessorUnwatch: (() => void) | null = null;
 
 // State
 const isShowingAnimation = ref(false);
@@ -83,14 +75,11 @@ const animationContainerStyle = computed(() => {
 });
 
 onMounted(async () => {
-  console.log("Autodarts Tools: Animations mounted");
+  console.log("Autodarts Tools: Animations: mounted");
 
   try {
     // Load config
     config.value = await AutodartsToolsConfig.getValue();
-
-    // Initialize the centralized game data processor
-    await initGameDataProcessor();
 
     // Update board position
     updateBoardPosition();
@@ -102,17 +91,31 @@ onMounted(async () => {
     updateInterval = setInterval(updateBoardPosition, 1000);
 
     // Register with centralized game data processor
-    // useGameDataProcessor handles onUnmounted cleanup automatically
-    useGameDataProcessor("animations", async (triggers: IGameTrigger[], gameData: IGameData) => {
-      if (!triggers.length || !gameData.match) return;
+    if (!gameDataProcessorUnwatch) {
+      registerGameDataCallback("animations", async (triggers: IGameTrigger[], gameData: IGameData) => {
+        if (!triggers.length || !gameData.match) return;
 
-      // For animations, we only want to play the highest priority trigger
-      // since we can only show one animation at a time
-      const trigger = triggers[0];
-      await playAnimation(trigger.trigger);
-    });
+        // let triggers_list: string = "";
+        // triggers.forEach((trigger) => {
+        //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+        // });
+        // console.log("Autodarts Tools: Animations: processing triggers", triggers_list)
+
+        // For animations, we only want to play the highest priority trigger
+        // since we can only show one animation at a time
+        while (triggers.length) {
+          const trigger: IGameTrigger = triggers.shift() as IGameTrigger;
+          const animationUrl = await getAnimationUrl(trigger.trigger);
+          if (!animationUrl)
+            continue;
+          await playAnimation(animationUrl);
+          break;
+        }
+      });
+      gameDataProcessorUnwatch = () => unregisterGameDataCallback("animations");
+    }
   } catch (error) {
-    console.error("Autodarts Tools: Animation initialization error", error);
+    console.error("Autodarts Tools: Animations: initialization error", error);
   }
 });
 
@@ -125,7 +128,12 @@ onUnmounted(() => {
   for (const url of Object.values(animationCache.value)) {
     URL.revokeObjectURL(url);
   }
-  // useGameDataProcessor cleanup is handled automatically via onUnmounted in the composable
+
+  // Clean up game data processor callback
+  if (gameDataProcessorUnwatch) {
+    gameDataProcessorUnwatch();
+    gameDataProcessorUnwatch = null;
+  }
 });
 
 function updateBoardPosition(): void {
@@ -217,7 +225,7 @@ async function getAnimationUrl(trigger: string): Promise<string | null> {
  */
 async function loadAnimationFromOPFS(animationId: string): Promise<string | null> {
   if (!isOPFSAvailable()) {
-    console.error("Autodarts Tools: OPFS not available, cannot load animation", animationId);
+    console.error("Autodarts Tools: Animations: OPFS not available, cannot load animation", animationId);
     return null;
   }
 
@@ -229,7 +237,7 @@ async function loadAnimationFromOPFS(animationId: string): Promise<string | null
       return objectURL;
     }
   } catch (error) {
-    console.error("Error loading animation from OPFS:", error);
+    console.error("Autodarts Tools: Animations: Error loading animation from OPFS:", error);
   }
 
   return null;
@@ -238,12 +246,11 @@ async function loadAnimationFromOPFS(animationId: string): Promise<string | null
 /**
  * Play animation for a trigger
  */
-async function playAnimation(trigger: string): Promise<void> {
-  console.log("Autodarts Tools: Playing animation", trigger);
-
+async function playAnimation(animationUrl: string): Promise<void> {
   try {
-    const animationUrl = await getAnimationUrl(trigger);
     if (!animationUrl) return;
+
+    console.log("Autodarts Tools: Animations: Playing animation", animationUrl);
 
     // Update the board position before showing animation
     updateBoardPosition();
@@ -279,7 +286,7 @@ async function playAnimation(trigger: string): Promise<void> {
       }, duration);
     }, delayStart);
   } catch (error) {
-    console.error("Autodarts Tools: Play animation error", error);
+    console.error("Autodarts Tools: Animations: Play error", error);
   }
 }
 

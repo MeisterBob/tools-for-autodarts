@@ -18,7 +18,7 @@ export const websocketCaptureScript = `
     socket.send = function(data) {
       try {
         // Log outgoing messages
-        console.log('[WebSocket Outgoing]', {
+        console.log('Autodarts Tools: Websocket: [WebSocket Outgoing]', {
           url,
           data: typeof data === 'string' ? data : '(binary data)',
           timestamp: new Date().toISOString()
@@ -33,7 +33,7 @@ export const websocketCaptureScript = `
           }
         }));
       } catch (error) {
-        console.error('Error intercepting WebSocket send:', error);
+        console.error('Autodarts Tools: Websocket: Error intercepting WebSocket send:', error);
       }
       
       // Call the original send method
@@ -44,7 +44,7 @@ export const websocketCaptureScript = `
     socket.addEventListener('message', function(event) {
       try {
         // Log incoming messages
-        console.log('[WebSocket Incoming]', {
+        console.log('Autodarts Tools: Websocket: [WebSocket Incoming]', {
           url,
           data: typeof event.data === 'string' ? event.data : '(binary data)',
           timestamp: new Date().toISOString()
@@ -59,7 +59,7 @@ export const websocketCaptureScript = `
           }
         }));
       } catch (error) {
-        console.error('Error intercepting WebSocket message:', error);
+        console.error('Autodarts Tools: Websocket: Error intercepting WebSocket message:', error);
       }
     });
     
@@ -76,7 +76,7 @@ export const websocketCaptureScript = `
   // Set the prototype
   window.WebSocket.prototype = OriginalWebSocket.prototype;
   
-  console.log('[WebSocket Capture] Initialized');
+  console.log('Autodarts Tools: Websocket: [WebSocket Capture] Initialized');
 })();
 `;
 
@@ -92,8 +92,8 @@ export async function injectWebSocketCapture() {
         script.remove();
       },
     });
-    console.log("WebSocket capture script injected successfully");
+    console.log("Autodarts Tools: Websocket: WebSocket capture script injected successfully");
   } catch (error) {
-    console.error("Failed to inject WebSocket capture script:", error);
+    console.error("Autodarts Tools: Websocket: Failed to inject WebSocket capture script:", error);
   }
 }

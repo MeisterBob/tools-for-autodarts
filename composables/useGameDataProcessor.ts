@@ -1,5 +1,116 @@
-import { type IGameData } from "@/utils/game-data-storage";
+import { type IGameData, GameMode } from "@/utils/game-data-storage";
 import { AutodartsToolsGameData } from "@/utils/game-data-storage";
+
+/**
+ * # GameDataProcessor Documentation
+ *
+ * ## Overview
+ * The GameDataProcessor is a centralized event system that monitors game state changes and derives
+ * "triggers" (named events) from game data. Multiple modules can subscribe to these triggers to react
+ * to game events (e.g., animations, sounds, WLED effects).
+ *
+ * ## How It Works
+ *
+ * ### Initialization Phase
+ * 1. Call `initGameDataProcessor()` once during extension startup (typically in a content script or background)
+ * 2. This watches the IndexedDB game data store and detects changes
+ * 3. When game data changes, triggers are automatically derived and dispatched to all registered callbacks
+ *
+ * ### Trigger Derivation
+ * When game data updates, the processor analyzes the current and previous game state to derive triggers:
+ * - **Match events**: matchshot, gameshot, bulloff
+ * - **Player events**: player names, bot detection, gameon, next_player
+ * - **Throw events**: individual throws (s20, d10), combined throws (s1_d20_b), busted, outside
+ * - **Score events**: total points (50), remaining points (yr_170), checkouts
+ * - **Variant-specific**: Cricket misses, ATC targets, RTW fields, Shanghai, Bob's 27
+ *
+ * ### Priority System
+ * Each trigger has a priority level (lower number = higher priority, plays first):
+ * - 10: Matchshot variant (player-specific)
+ * - 11: Matchshot
+ * - 20: Gameshot variant
+ * - 21: Gameshot
+ * - 30: Busted
+ * - 40: Combined throws (e.g., s1_d20_b)
+ * - 50: Point total (e.g., 50)
+ * - 55: Remaining points
+ * - 60: Individual throw (e.g., s20, d10)
+ * - 70: Player name / bot
+ * - 80: Board events
+ * - 90: Fallback/other
+ *
+ * ## How to Use
+ *
+ * ### For Vue Components
+ * Use the `useGameDataProcessor()` composable hook in `<script setup>`:
+ *
+ * ```typescript
+ * import { useGameDataProcessor, type GameDataCallback } from "@/composables/useGameDataProcessor";
+ *
+ * const handleTriggers: GameDataCallback = (triggers, gameData, oldGameData, fromWebSocket) => {
+ *   console.log("Received triggers:", triggers);
+ *   // React to triggers here
+ * };
+ *
+ * // Register with default priority (ascending - highest priority first)
+ * useGameDataProcessor("my-module", handleTriggers);
+ *
+ * // Or customize priority order and override specific trigger priorities
+ * useGameDataProcessor("my-module", handleTriggers, {
+ *   sortOrder: "desc",  // "asc" (default) or "desc"
+ *   priorityOverrides: {
+ *     "matchshot": 5,  // Play matchshot before gameshot
+ *     "s20": 35        // Play s20 before busted
+ *   }
+ * });
+ * ```
+ *
+ * Automatically unregisters on component unmount.
+ *
+ * ### For Non-Vue Modules
+ * Call the functions directly:
+ *
+ * ```typescript
+ * import {
+ *   initGameDataProcessor,
+ *   registerGameDataCallback,
+ *   unregisterGameDataCallback,
+ *   type GameDataCallback
+ * } from "@/composables/useGameDataProcessor";
+ *
+ * // Initialize once
+ * await initGameDataProcessor();
+ *
+ * // Register callback
+ * const callback: GameDataCallback = (triggers, gameData, oldGameData, fromWebSocket) => {
+ *   triggers.forEach(trigger => {
+ *     console.log(`Trigger: ${trigger.trigger} (priority: ${trigger.priority})`);
+ *   });
+ * };
+ * registerGameDataCallback("my-module", callback);
+ *
+ * // Cleanup when done
+ * unregisterGameDataCallback("my-module");
+ * cleanupGameDataProcessor();
+ * ```
+ *
+ * ## Callback Parameters
+ * The callback receives:
+ * - **triggers**: Array of `IGameTrigger` objects sorted by priority (highest priority first by default)
+ * - **gameData**: Current game state
+ * - **oldGameData**: Previous game state (for detecting changes)
+ * - **fromWebSocket**: Boolean indicating if update came from WebSocket (live) or storage sync
+ *
+ * ## Trigger Categories
+ * Triggers are organized into categories for filtering:
+ * - `match`: matchshot, gameshot, bulloff
+ * - `throw`: individual throws, combined throws, busted
+ * - `total`: total points of a turn
+ * - `remaining`: remaining points in a leg
+ * - `player`: player names, bot detection, turn transitions
+ * - `board`: external board events
+ * - `other`: miscellaneous triggers
+ */
 
 /**
  * Represents a trigger with priority information
@@ -8,7 +119,7 @@ import { AutodartsToolsGameData } from "@/utils/game-data-storage";
 export interface IGameTrigger {
   trigger: string;
   priority: number;
-  category: "match" | "throw" | "total" | "remaining" | "player" | "board" | "ambient" | "other";
+  category: "match" | "throw" | "total" | "remaining" | "player" | "board" | "other";
 }
 
 /**
@@ -24,6 +135,8 @@ export type GameDataCallback = (
   oldGameData: IGameData,
   fromWebSocket: boolean,
 ) => void | Promise<void>;
+
+let oldTriggers: IGameTrigger[] = [];
 
 /** Sort order for trigger priority */
 export type TriggerSortOrder = "asc" | "desc";
@@ -43,12 +156,11 @@ export enum TRIGGER_PRIORITIES {
   GAMESHOT_VARIANT = 20,    // Player-specific gameshot (gameshot_playername)
   GAMESHOT = 21,            // Game won
   BUSTED = 30,              // Turn busted
-  COMBINED_THROWS = 40,     // Multiple throws combined (s1_d20_b)
-  POINT_TOTAL = 50,         // Total points of turn
-  POINT_REMAINING = 55,     // Remaining points
-  INDIVIDUAL_THROW = 60,    // Single throw (s1, d20, etc)
-  PLAYER_NAME = 70,         // Player name or bot
-  AMBIENT = 80,             // Ambient effects (prefix-based)
+  PLAYER_NAME = 40,         // Player name or bot
+  COMBINED_THROWS = 50,     // Multiple throws combined (s1_d20_b)
+  POINT_TOTAL = 60,         // Total points of turn
+  POINT_REMAINING = 70,     // Remaining points
+  INDIVIDUAL_THROW = 80,    // Single throw (s1, d20, etc)
   BOARD_EVENT = 90,         // Board events
   OTHER = 100,              // Fallback triggers
 }
@@ -73,13 +185,13 @@ const callbacks: Map<string, RegisteredCallback> = new Map();
 export async function initGameDataProcessor(): Promise<void> {
   // If already initialized, return immediately
   if (gameDataWatcherUnwatch) {
-    console.log("Autodarts Tools: Game data processor already initialized");
+    console.log("Autodarts Tools: GameDataprocessor: already initialized");
     return;
   }
 
   // If initialization is in progress, wait for it
   if (initializationPromise) {
-    console.log("Autodarts Tools: Game data processor initialization in progress, waiting...");
+    console.log("Autodarts Tools: GameDataprocessor: initialization in progress, waiting...");
     return initializationPromise;
   }
 
@@ -92,7 +204,7 @@ export async function initGameDataProcessor(): Promise<void> {
  * Actual initialization logic
  */
 async function performInitialization(): Promise<void> {
-  console.log("Autodarts Tools: Initializing centralized game data processor");
+  console.log("Autodarts Tools: GameDataprocessor: Initializing");
 
   const initialGameData = await AutodartsToolsGameData.getValue();
   oldGameData = initialGameData;
@@ -101,7 +213,7 @@ async function performInitialization(): Promise<void> {
     (gameData: IGameData) => {
       console.log("Autodarts Tools: GameDataprocessor: gameData incomming:", gameData);
       processGameData(gameData, oldGameData!, true);
-      oldGameData = JSON.parse(JSON.stringify(gameData));
+      oldGameData = gameData;
     },
   );
 }
@@ -135,17 +247,42 @@ export function registerGameDataCallback(
     priorityOverrides: options.priorityOverrides ?? {},
   };
   console.log(
-    `Autodarts Tools: Registering game data callback for module: ${moduleId} (sort order: ${finalOptions.sortOrder}, overrides: ${Object.keys(finalOptions.priorityOverrides).length})`,
+    `Autodarts Tools: GameDataprocessor: Registering game data callback for module: ${moduleId} (sort order: ${finalOptions.sortOrder}, overrides: ${Object.keys(finalOptions.priorityOverrides).length})`,
   );
   callbacks.set(moduleId, { callback, options: finalOptions });
+
+  if (oldTriggers.length > 0) {
+    runCallback(callback, oldTriggers, finalOptions, oldGameData!, oldGameData!, false);
+  }
 }
 
 /**
  * Unregister a callback
  */
 export function unregisterGameDataCallback(moduleId: string): void {
-  console.log(`Autodarts Tools: Unregistering game data callback for module: ${moduleId}`);
+  console.log(`Autodarts Tools: GameDataprocessor: Unregistering game data callback for module: ${moduleId}`);
   callbacks.delete(moduleId);
+}
+
+async function runCallback(
+  callback: GameDataCallback,
+  triggers: IGameTrigger[],
+  options: Required<CallbackOptions>,
+  gameData: IGameData,
+  oldGameData: IGameData,
+  fromWebSocket: boolean
+): Promise<void> {
+  // Apply priority overrides to triggers for this module
+  const customizedTriggers = triggers.map(trigger => {
+    const override = options.priorityOverrides[trigger.trigger] ?? options.priorityOverrides[trigger.priority];
+    return override !== undefined ? { ...trigger, priority: override } : trigger;
+  });
+
+  // Sort by (potentially customized) priority
+  const sortedTriggers = [...customizedTriggers].sort((a, b) =>
+    options.sortOrder === "asc" ? a.priority - b.priority : b.priority - a.priority,
+  );
+  return Promise.resolve(callback(sortedTriggers, gameData, oldGameData, fromWebSocket));
 }
 
 /**
@@ -156,9 +293,8 @@ async function processGameData(
   oldGameData: IGameData,
   fromWebSocket: boolean = false,
 ): Promise<void> {
-  if (!gameData.match || !gameData.match.turns?.length) {
+  if (!gameData.match || !gameData.match.turns?.length)
     return;
-  }
 
   const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
   if (editMode) {
@@ -168,22 +304,18 @@ async function processGameData(
   // Derive all possible triggers from the game state (unsorted)
   const triggers = deriveGameTriggers(gameData, oldGameData);
 
-  console.log("Autodarts Tools: GameDataprocessor: found triggers:", triggers);
+  let triggers_list: string = "";
+  triggers.forEach((trigger) => {
+    triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+  });
+  console.log("Autodarts Tools: GameDataprocessor: found triggers:", triggers_list);
 
   // Call all registered callbacks, applying priority overrides and sorting according to each module's preference
   const callbackPromises = Array.from(callbacks.entries()).map(([_moduleId, { callback, options }]) => {
-    // Apply priority overrides to triggers for this module
-    const customizedTriggers = triggers.map(trigger => {
-      const override = options.priorityOverrides[trigger.trigger] ?? options.priorityOverrides[trigger.priority];
-      return override !== undefined ? { ...trigger, priority: override } : trigger;
-    });
-
-    // Sort by (potentially customized) priority
-    const sortedTriggers = [...customizedTriggers].sort((a, b) =>
-      options.sortOrder === "asc" ? a.priority - b.priority : b.priority - a.priority,
-    );
-    return Promise.resolve(callback(sortedTriggers, gameData, oldGameData, fromWebSocket));
+    return runCallback(callback, triggers, options, gameData, oldGameData, fromWebSocket);
   });
+
+  oldTriggers = triggers;
 
   await Promise.all(callbackPromises);
 }
@@ -198,8 +330,8 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
   if (!gameData.match) return triggers;
 
   // Winner detection - HIGHEST PRIORITY
-  const winnerMatch = gameData.match.winner >= 0;
-  const winner = gameData.match.gameWinner >= 0;
+  const winnerMatch = gameData.match.winner >= 0 && gameData.gameMode !== GameMode.BULL_OFF;
+  const winner = gameData.match.gameWinner >= 0 && gameData.gameMode !== GameMode.BULL_OFF;
   const currentPlayer = gameData.match.players?.[gameData.match.player];
   const playerName = currentPlayer?.name?.toLowerCase() || "";
   const playerNameUnderscore = playerName.replace(/\s+/g, "_");
@@ -216,13 +348,16 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
         category: "match",
       });
-      triggers.push({
-        trigger: `matchshot_${playerNameUnderscore}`,
-        priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
-        category: "match",
-      });
+      if (playerNameUnderscore !== playerName) {
+        triggers.push({
+          trigger: `matchshot_${playerNameUnderscore}`,
+          priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
+          category: "match",
+        });
+      }
     }
-  } else if (winner) {
+  }
+  if (winner) {
     triggers.push({
       trigger: "gameshot",
       priority: TRIGGER_PRIORITIES.GAMESHOT,
@@ -234,16 +369,43 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
         category: "match",
       });
-      triggers.push({
-        trigger: `gameshot_${playerNameUnderscore}`,
-        priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
-        category: "match",
-      });
+      if (playerNameUnderscore !== playerName) {
+        triggers.push({
+          trigger: `gameshot_${playerNameUnderscore}`,
+          priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
+          category: "match",
+        });
+      }
     }
   }
 
   // Bull-off handling
-  if (gameData.match.variant === "Bull-off") {
+  if (gameData.match.variant === GameMode.BULL_OFF) {
+    const currentPlayer = gameData.match.players?.[gameData.match.player];
+    const playerName = currentPlayer?.name?.toLowerCase() || "";
+    const playerNameUnderscore = playerName.replace(/\s+/g, "_");
+    const isBot = !!currentPlayer?.cpuPPR;
+
+    if (isBot) {
+      triggers.push({
+        trigger: "bulloff_bot",
+        priority: TRIGGER_PRIORITIES.OTHER,
+        category: "other",
+      });
+    } else {
+      triggers.push({
+        trigger: `bulloff_${playerName}`,
+        priority: TRIGGER_PRIORITIES.OTHER,
+        category: "other",
+      });
+    }
+    if (playerName != playerNameUnderscore) {
+      triggers.push({
+        trigger: `bulloff_${playerNameUnderscore}`,
+        priority: TRIGGER_PRIORITIES.OTHER,
+        category: "other",
+      });
+    }
     triggers.push({
       trigger: "bulloff",
       priority: TRIGGER_PRIORITIES.OTHER,
@@ -276,56 +438,39 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
         category: "player",
       });
-      triggers.push({
-        trigger: "ambient_bot",
-        priority: TRIGGER_PRIORITIES.AMBIENT,
-        category: "ambient",
-      });
     } else if (playerName) {
       triggers.push({
         trigger: playerName,
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
         category: "player",
       });
+      if (playerName != playerNameUnderscore) {
+        triggers.push({
+          trigger: playerNameUnderscore,
+          priority: TRIGGER_PRIORITIES.PLAYER_NAME,
+          category: "player",
+        });
+      }
       triggers.push({
-        trigger: playerNameUnderscore,
+        trigger: `player_${gameData.match.player + 1}`,
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
         category: "player",
-      });
-      triggers.push({
-        trigger: `ambient_${playerName}`,
-        priority: TRIGGER_PRIORITIES.AMBIENT,
-        category: "ambient",
-      });
-      triggers.push({
-        trigger: `ambient_${playerNameUnderscore}`,
-        priority: TRIGGER_PRIORITIES.AMBIENT,
-        category: "ambient",
       });
     }
 
     // gameon trigger for start of match
-    if (gameData.match.round === 1 && gameData.match.turns[0].throws.length === 0 && gameData.match.player === 0) {
+    console.log("Autodarts Tools: GameDataProcessor:", playerChanged, gameData.match.round, gameData.match.player);
+    if (gameData.match.round === 1 && gameData.match.player === 0) {
       triggers.push({
         trigger: "gameon",
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
         category: "player",
-      });
-      triggers.push({
-        trigger: "ambient_gameon",
-        priority: TRIGGER_PRIORITIES.AMBIENT,
-        category: "ambient",
       });
     } else if (playerChanged) {
       triggers.push({
         trigger: "next_player",
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
         category: "player",
-      });
-      triggers.push({
-        trigger: "ambient_next_player",
-        priority: TRIGGER_PRIORITIES.AMBIENT,
-        category: "ambient",
       });
     }
   }
@@ -354,11 +499,6 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
       if (busted) {
         triggers.push({
           trigger: "busted",
-          priority: TRIGGER_PRIORITIES.BUSTED,
-          category: "throw",
-        });
-        triggers.push({
-          trigger: "cricket_miss",
           priority: TRIGGER_PRIORITIES.BUSTED,
           category: "throw",
         });
@@ -420,17 +560,17 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
       // Specific checkout triggers
       triggers.push({
         trigger: `yr_${currentScore}`,
-        priority: TRIGGER_PRIORITIES.POINT_TOTAL,
+        priority: TRIGGER_PRIORITIES.POINT_REMAINING,
         category: "throw",
       });
       triggers.push({
         trigger: `you_require_${currentScore}`,
-        priority: TRIGGER_PRIORITIES.POINT_TOTAL,
+        priority: TRIGGER_PRIORITIES.POINT_REMAINING,
         category: "throw",
       });
       triggers.push({
         trigger: "you_require",
-        priority: TRIGGER_PRIORITIES.POINT_TOTAL,
+        priority: TRIGGER_PRIORITIES.POINT_REMAINING,
         category: "throw",
       });
     }
@@ -445,58 +585,61 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
 function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameData): IGameTrigger[] {
   const triggers: IGameTrigger[] = [];
 
-  if (!gameData.match) return triggers;
+  if (!gameData.match)
+    return triggers;
 
+  console.log("Autodarts Tools: GameDataprocessor:", gameData);
   switch (gameData.match.variant) {
-    case "Cricket": {
+    case GameMode.CRICKET:
+    case GameMode.TACTICS: {
+      console.log("Autodarts Tools: GameDataprocessor: deriveVariantSpecificTriggers: Cricket");
       // Cricket-specific triggers
-      if (gameData.match.turns[0].throws.length > 0) {
-        const latestThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
-        if (latestThrow) {
-          const segmentName = latestThrow.segment.name.toLowerCase();
-          let segmentNumber = 0;
+      const latestThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
+      console.log("Autodarts Tools: GameDataprocessor:", latestThrow);
+      if (latestThrow) {
+        const segmentName = latestThrow.segment.name.toLowerCase();
+        let segmentNumber = 0;
 
-          if (segmentName === "bull" || segmentName === "25") {
-            segmentNumber = 25;
-          } else if (segmentName.includes("miss") || segmentName.includes("outside")) {
-            segmentNumber = 0;
-          } else {
-            const match = segmentName.match(/[sdt](\d+)/i);
-            if (match && match[1]) {
-              segmentNumber = Number.parseInt(match[1], 10);
-            }
+        if (segmentName === "bull" || segmentName === "25") {
+          segmentNumber = 25;
+        } else if (segmentName.includes("miss") || segmentName.includes("outside")) {
+          segmentNumber = 0;
+        } else {
+          const match = segmentName.match(/[sdt](\d+)/i);
+          if (match && match[1]) {
+            segmentNumber = Number.parseInt(match[1], 10);
           }
+        }
 
-          const gameMode = gameData.match.settings?.gameMode;
-          const segmentNumberToScore = gameMode === "Tactics" ? 10 : 15;
+        const gameMode = gameData.match.settings?.gameMode;
+        const segmentNumberToScore = gameMode === GameMode.TACTICS ? 10 : 15;
 
-          if (segmentNumber >= segmentNumberToScore) {
-            // Check if segment is already closed
-            const stateIndex = latestThrow.segment.number === 50 ? 25 : latestThrow.segment.number;
-            const segmentValues = oldGameData?.match?.state?.segments?.[stateIndex] || [];
-            const allPlayersClosed = segmentValues.length > 0 && segmentValues.every(value => value >= 3);
+        if (segmentNumber >= segmentNumberToScore) {
+          // Check if segment is already closed
+          const stateIndex = latestThrow.segment.number === 50 ? 25 : latestThrow.segment.number;
+          const segmentValues = oldGameData?.match?.state?.segments?.[stateIndex] || [];
+          const allPlayersClosed = segmentValues.length > 0 && segmentValues.every(value => value >= 3);
 
-            if (allPlayersClosed) {
-              triggers.push({
-                trigger: "cricket_miss",
-                priority: TRIGGER_PRIORITIES.OTHER,
-                category: "throw",
-              });
-            }
+          if (allPlayersClosed) {
+            triggers.push({
+              trigger: "cricket_miss",
+              priority: TRIGGER_PRIORITIES.OTHER,
+              category: "throw",
+            });
           }
         }
       }
       break;
     }
 
-    case "ATC": // Around The Clock
-    case "RTW": // Round The World
-    case "Shanghai":
-    case "Bob's 27": {
+    case GameMode.ATC: // Around The Clock
+    case GameMode.RTW: // Round The World
+    case GameMode.SHANGHAI:
+    case GameMode.BOBS_27: {
       let targetField: string | number = 0;
 
       switch (gameData.match.variant) {
-        case "ATC": {
+        case GameMode.ATC: {
           const player = gameData.match.player;
           targetField =
             gameData.match.state.targets?.[player]?.[gameData.match.state.currentTargets?.[player]]?.number || 0;
@@ -509,20 +652,19 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
           }
           break;
         }
-        case "RTW": {
+        case GameMode.RTW: {
           const round = gameData.match.round;
           targetField = gameData.match.state.targets?.[round - 1]?.number || 0;
           break;
         }
-        case "Shanghai": {
+        case GameMode.SHANGHAI: {
           const round = gameData.match.round;
           targetField = gameData.match.state.targets?.[round - 1] || 0;
           break;
         }
-        case "Bob's 27": {
+        case GameMode.BOBS_27:
           targetField = gameData.match.round;
           break;
-        }
       }
 
       if (targetField) {
@@ -534,7 +676,23 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
       }
       break;
     }
+
+    case GameMode.GOTCHA: {
+      const currentScores = gameData.match.gameScores;
+      const previousScores = oldGameData?.match?.gameScores;
+      if (previousScores && previousScores.length === currentScores.length
+        && currentScores[gameData.match.player] > 0
+        && currentScores.some((score, i) => score === 0 && previousScores[i] > 0)) {
+        triggers.push({
+          trigger: `gotcha`,
+          priority: TRIGGER_PRIORITIES.BUSTED,
+          category: "throw",
+        });
+      }
+    }
   }
+
+  console.log("Autodarts Tools: GameDataprocessor: deriveVariantSpecificTriggers: Triggers:", triggers);
 
   return triggers;
 }

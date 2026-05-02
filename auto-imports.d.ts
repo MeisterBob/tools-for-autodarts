@@ -45,6 +45,7 @@ declare global {
   const defineUnlistedScript: typeof import('#imports')['defineUnlistedScript']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
+  const endRegistrationPhase: typeof import('./composables/useGameDataProcessor')['endRegistrationPhase']
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']

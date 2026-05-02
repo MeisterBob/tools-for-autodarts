@@ -1,17 +1,19 @@
 import type { IMatch } from "./websocket-helpers";
 
 export enum GameMode {
-  X01 = "X01",
-  CRICKET_TACTICS = "Cricket / Tactics",
-  BERMUDA = "Bermuda",
-  SHANGHAI = "Shanghai",
-  GOTCHA = "Gotcha",
   ATC = "ATC",
-  RTW = "RTW",
-  RANDOM_CHECKOUT = "Random Checkout",
-  COUNT_UP = "CountUp",
-  SEGMENT_TRAINING = "Segment Training",
+  BERMUDA = "Bermuda",
   BOBS_27 = "Bob's 27",
+  BULL_OFF = "Bull-off",
+  COUNT_UP = "CountUp",
+  CRICKET = "Cricket",
+  GOTCHA = "Gotcha",
+  RANDOM_CHECKOUT = "Random Checkout",
+  RTW = "RTW",
+  SEGMENT_TRAINING = "Segment Training",
+  SHANGHAI = "Shanghai",
+  TACTICS = "Tactics",
+  X01 = "X01",
 }
 
 export interface IGameData {

@@ -32,9 +32,10 @@ import {
 import { fetchWithAuth, isSafari, isiOS } from "@/utils/helpers";
 import { processWebSocketMessage } from "@/utils/websocket-helpers";
 import { AutodartsToolsGameData } from "@/utils/game-data-storage";
+import { initGameDataProcessor } from "@/composables/useGameDataProcessor";
 
 let matchInitialized = false;
-let activeMatchObserver: MutationObserver;
+let activeMatchObserver: MutationObserver | null;
 let gameDataWatcher: any;
 
 const tools = {
@@ -48,8 +49,132 @@ const tools = {
   gotcha: null as any,
 };
 
+/** Configuration for feature initializers */
+interface FeatureInitializer {
+  configPath: string; // dot-notation path to config property (e.g., "animations.enabled")
+  init: (ctx: any, url: string) => Promise<void>;
+  toolName?: string; // name of property in tools object to store result
+  onRemove?: () => void; // cleanup function
+}
+
+/** Define all feature initializers in order */
+const featureInitializers: FeatureInitializer[] = [
+  // Sounds, Animation and WLED
+  {
+    configPath: "animations.enabled",
+    init: (ctx) => initAnimations(ctx),
+    toolName: "animations",
+  },
+  {
+    configPath: "caller.enabled",
+    init: (ctx, url) => initScript(caller, url),
+    onRemove: callerOnRemove,
+  },
+  {
+    configPath: "soundFx.enabled",
+    init: (ctx, url) => initScript(soundFx, url),
+    onRemove: soundFxOnRemove,
+  },
+  {
+    configPath: "wledFx.enabled",
+    init: (ctx, url) => initScript(wledFx, url),
+    onRemove: wledFxOnRemove,
+  },
+  // Matches
+  {
+    configPath: "hideMenuInMatch.enabled",
+    init: (ctx, url) => initScript(hideMenuInMatch, url),
+    onRemove: hideMenuInMatchOnRemove,
+  },
+  {
+    configPath: "automaticFullscreen.enabled",
+    init: (ctx, url) => initScript(automaticFullscreen, url),
+    onRemove: automaticFullscreenOnRemove,
+  },
+  {
+    configPath: "streamingMode.enabled",
+    init: (ctx) => initStreamingMode(ctx),
+    toolName: "streamingMode",
+  },
+  {
+    configPath: "colors.enabled",
+    init: (ctx, url) => initScript(colorChange, url),
+    onRemove: colorChangeOnRemove,
+  },
+  {
+    configPath: "takeout.enabled",
+    init: (ctx) => initTakeout(ctx),
+    toolName: "takeout",
+  },
+  {
+    configPath: "nextPlayerOnTakeOutStuck.enabled",
+    init: (ctx, url) => initScript(nextPlayerOnTakeOutStuck, url),
+    onRemove: nextPlayerOnTakeOutStuckOnRemove,
+  },
+  {
+    configPath: "automaticNextLeg.enabled",
+    init: (ctx, url) => initScript(automaticNextLeg, url),
+    onRemove: automaticNextLegOnRemove,
+  },
+  {
+    configPath: "smallerScores.enabled",
+    init: (ctx, url) => initScript(smallerScores, url),
+  },
+  {
+    configPath: "largerLegsSets.enabled",
+    init: (ctx, url) => initScript(largerLegsSets, url),
+  },
+  {
+    configPath: "largerPlayerMatchData.enabled",
+    init: (ctx, url) => initScript(largerPlayerMatchData, url),
+  },
+  {
+    configPath: "largerPlayerNames.enabled",
+    init: (ctx, url) => initScript(largerPlayerNames, url),
+  },
+  {
+    configPath: "winnerAnimation.enabled",
+    init: (ctx, url) => initScript(winnerAnimation, url),
+    onRemove: winnerAnimationOnRemove,
+  },
+  {
+    configPath: "zoom.enabled",
+    init: (ctx) => initZoom(ctx),
+    toolName: "zoom",
+  },
+  {
+    configPath: "quickCorrection.enabled",
+    init: (ctx) => initQuickCorrection(ctx),
+    toolName: "quickCorrection",
+  },
+  {
+    configPath: "instantReplay.enabled",
+    init: (ctx) => initInstantReplay(ctx),
+    toolName: "instantReplay",
+  },
+  {
+    configPath: "gotcha.enabled",
+    init: (ctx) => initGotcha(ctx),
+    toolName: "gotcha",
+  },
+  {
+    configPath: "enhancedScoringDisplay.enabled",
+    init: (ctx, url) => initScript(enhancedScoringDisplay, url),
+    onRemove: enhancedScoringDisplayOnRemove,
+  },
+];
+
+/**
+ * Get nested config value using dot notation
+ * @param obj Config object
+ * @param path Dot-notation path (e.g., "animations.enabled")
+ */
+function getConfigValue(obj: any, path: string): any {
+  return path.split(".").reduce((current, prop) => current?.[prop], obj);
+}
+
 export default defineContentScript({
-  matches: [ "*://play.autodarts.io/*" ],
+  matches: ["*://play.autodarts.io/*"],
   cssInjectionMode: "ui",
   async main(ctx: any) {
     AutodartsToolsUrlStatus.watch(async (url: string) => {
@@ -92,7 +217,7 @@ export default defineContentScript({
           }
         }
 
-        const activeMatch = window.location.href.includes("boards") ? !(await waitForElementWithTextContent("h2", [ "Board has no active match", "Board hat kein aktives Spiel", "Bord heeft geen actieve wedstrijd" ], 1000).catch(() => undefined)) : true;
+        const activeMatch = window.location.href.includes("boards") ? !(await waitForElementWithTextContent("h2", ["Board has no active match", "Board hat kein aktives Spiel", "Bord heeft geen actieve wedstrijd"], 1000).catch(() => undefined)) : true;
 
         if (activeMatch) {
           console.log("Autodarts Tools: Match found, initializing match");
@@ -131,97 +256,27 @@ async function initMatch(ctx, url: string, matchId?: string) {
   console.log("Autodarts Tools: Initializing match");
 
   const config = await AutodartsToolsConfig.getValue();
+  await initGameDataProcessor();
 
-  if (config.hideMenuInMatch.enabled) {
-    await initScript(hideMenuInMatch, url).catch(console.error);
+  // Initialize all features based on configuration
+  for (const feature of featureInitializers) {
+    if (getConfigValue(config, feature.configPath)) {
+      try {
+        const result = await feature.init(ctx, url);
+        if (feature.toolName && result) {
+          tools[feature.toolName] = result;
+        }
+      } catch (error) {
+        console.error(`Autodarts Tools: Error initializing ${feature.configPath}:`, error);
+      }
+    }
   }
 
-  if (config.automaticFullscreen.enabled) {
-    await initScript(automaticFullscreen, url).catch(console.error);
-  }
-
-  if (config.streamingMode.enabled) {
-    await initStreamingMode(ctx).catch(console.error);
-  }
-
-  if (config.colors.enabled) {
-    await initScript(colorChange, url).catch(console.error);
-  }
-
-  if (config.takeout.enabled) {
-    await initTakeout(ctx).catch(console.error);
-  }
-
-  if (config.nextPlayerOnTakeOutStuck.enabled) {
-    await initScript(nextPlayerOnTakeOutStuck, url).catch(console.error);
-  }
-
-  if (config.automaticNextLeg.enabled) {
-    await initScript(automaticNextLeg, url).catch(console.error);
-  }
-
-  if (config.smallerScores.enabled) {
-    await initScript(smallerScores, url).catch(console.error);
-  }
-
-  if (config.largerLegsSets.enabled) {
-    await initScript(largerLegsSets, url).catch(console.error);
-  }
-
-  if (config.largerPlayerMatchData.enabled) {
-    await initScript(largerPlayerMatchData, url).catch(console.error);
-  }
-
-  if (config.largerPlayerNames.enabled) {
-    await initScript(largerPlayerNames, url).catch(console.error);
-  }
-
-  if (config.winnerAnimation.enabled) {
-    await initScript(winnerAnimation, url).catch(console.error);
-  }
-
-  if (config.zoom.enabled) {
-    await initZoom(ctx).catch(console.error);
-  }
-
-  if (config.quickCorrection.enabled) {
-    await initQuickCorrection(ctx).catch(console.error);
-  }
-
-  if (config.instantReplay.enabled) {
-    await initInstantReplay(ctx).catch(console.error);
-  }
-
-  if (config.gotcha?.enabled) {
-    await initGotcha(ctx).catch(console.error);
-  }
-
+  // Special case: discord stream (requires additional check)
   if (matchId && config.discord.autoStartAfterTimer?.stream) {
-    if (config.discord.autoStartAfterTimer?.matchId === matchId || config.discord.autoStartAfterTimer?.matchId?.includes(matchId)) await initScript(discordStream, url).catch(console.error);
-  }
-
-  // *********************** YOU CAN ADD HERE ***********************
-
-  if (config.enhancedScoringDisplay.enabled) {
-    await initScript(enhancedScoringDisplay, url).catch(console.error);
-  }
-
-  // ****************************************************************
-
-  if (config.animations.enabled) {
-    await initAnimations(ctx).catch(console.error);
-  }
-
-  if (config.caller.enabled) {
-    await initScript(caller, url).catch(console.error);
-  }
-
-  if (config.soundFx.enabled) {
-    await initScript(soundFx, url).catch(console.error);
-  }
-
-  if (config.wledFx.enabled) {
-    await initScript(wledFx, url).catch(console.error);
+    if (config.discord.autoStartAfterTimer?.matchId === matchId || config.discord.autoStartAfterTimer?.matchId?.includes(matchId)) {
+      await initScript(discordStream, url).catch(console.error);
+    }
   }
 }
 
@@ -238,24 +293,31 @@ function clearMatch(fromBullOff: boolean = false) {
     gameDataWatcher = null;
   }
 
+  // Remove tool UI elements
   tools.streamingMode?.remove();
   tools.takeout?.remove();
   tools.animations?.remove();
   tools.zoom?.remove();
-  tools.gotcha?.forEach((e) =>  e.remove());
+  tools.gotcha?.forEach((e) => e.remove());
   tools.quickCorrection?.remove();
   tools.instantReplay?.remove();
-  colorChangeOnRemove();
+
+  // Call onRemove handlers for all features
+  for (const feature of featureInitializers) {
+    if (feature.onRemove) {
+      try {
+        feature.onRemove();
+      } catch (error) {
+        console.error(`Autodarts Tools: Error in cleanup for ${feature.configPath}:`, error);
+      }
+    }
+  }
+
+  // Special cleanup for features that need conditional removal
   if (!fromBullOff) hideMenuInMatchOnRemove();
   if (!fromBullOff) automaticFullscreenOnRemove();
-  winnerAnimationOnRemove();
-  callerOnRemove();
-  soundFxOnRemove();
-  wledFxOnRemove();
-  nextPlayerOnTakeOutStuckOnRemove();
   discordStreamOnRemove();
-  automaticNextLegOnRemove();
-  enhancedScoringDisplayOnRemove();
+
   matchInitialized = false;
 }
 
@@ -272,7 +334,7 @@ function startActiveMatchObserver(ctx) {
     if (!(/\/(matches|boards)\/([0-9a-f-]+)/.test(url)) || url.includes("history")) return;
 
     // Check if the "Board has no active match" element no longer exists
-    const activeMatch = window.location.href.includes("boards") ? !(await waitForElementWithTextContent("h2", [ "Board has no active match", "Board hat kein aktives Spiel", "Bord heeft geen actieve wedstrijd" ], 1000).catch(() => undefined)) : true;
+    const activeMatch = window.location.href.includes("boards") ? !(await waitForElementWithTextContent("h2", ["Board has no active match", "Board hat kein aktives Spiel", "Bord heeft geen actieve wedstrijd"], 1000).catch(() => undefined)) : true;
 
     if (!activeMatch) {
       console.log("Autodarts Tools Observer: No Active Match found, waiting for match to start");
@@ -442,7 +504,7 @@ async function initGotcha(ctx) {
     );
   });
   tools.gotcha = await Promise.all(shadowRootPromises);
-  tools.gotcha.forEach((e) =>  e.mount());
+  tools.gotcha.forEach((e) => e.mount());
 }
 
 async function initQuickCorrection(ctx) {

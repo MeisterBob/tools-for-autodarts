@@ -6,15 +6,12 @@ import { AutodartsToolsBoardData, type IBoard } from "@/utils/board-data-storage
 import { AutodartsToolsTournamentData, type ITournament } from "@/utils/tournament-data-storage";
 import { AutodartsToolsConfig, type IConfig, type IWled } from "@/utils/storage";
 import { triggerPatterns } from "@/utils/helpers";
-import { gameDataProcessor } from "@/utils/wled";
 import {
-  initGameDataProcessor,
   registerGameDataCallback,
   unregisterGameDataCallback,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import { WledType } from "#imports";
-import { forIn } from "lodash";
 
 let gameDataProcessorUnwatch: (() => void) | null = null;
 let lobbyDataWatcherUnwatch: any;
@@ -76,9 +73,6 @@ export async function wledFx() {
   try {
     config = await AutodartsToolsConfig.getValue();
     console.log(`Autodarts Tools: WLED: Config loaded, ${config.wledFx?.effects?.length || 0} effects available`);
-
-    // Initialize the centralized game data processor
-    await initGameDataProcessor();
 
     // Register with centralized game data processor (only once)
     if (!gameDataProcessorUnwatch) {
@@ -174,7 +168,11 @@ async function processGameDataFromTriggers(
 ): Promise<void> {
   if (!gameData.match || !gameData.match.turns?.length) return;
 
-  console.log("Autodarts Tools: WLED: processing triggers", triggers)
+  // let triggers_list: string = "";
+  // triggers.forEach((trigger) => {
+  //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+  // });
+  // console.log("Autodarts Tools: WLED: processing triggers", triggers_list)
 
   currentBoardId = gameData.match.players?.[gameData.match.player].boardId;
 
