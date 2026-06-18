@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Fixed authentication token capture for the Autodarts OAuth 2.0 migration (Keycloak shutdown on 2026-06-28)
+  - The page no longer hits the Keycloak token endpoint; `auth-cookie.ts` now watches the new auth server endpoints (`https://api.autodarts.io/auth/v1/exchange` and `/auth/v1/refresh`, plus `/auth/v1/token` and `/auth/v1/device/token`) and keeps the legacy Keycloak endpoint for the transition window
+  - Added endpoint-agnostic token capture from outgoing `Authorization: Bearer` headers on `fetch` requests (previously only XHR), so the captured token stays valid regardless of which auth server issued it and keeps up with the new 15-minute access-token lifetime
+  - No manifest, storage, or API-consumer changes were required — the existing `auth-cookie-available` event flow and `*://api.autodarts.io/*` host permission already cover the new endpoints
+
 ## [2.2.8] - 2026-03-23
 
 ### Added
