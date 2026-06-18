@@ -423,8 +423,7 @@ async function initGotcha(ctx) {
       {
         name: "autodarts-tools-gotcha",
         position: "inline",
-        anchor: `#${e.id} > div:first-of-type > p:first-of-type`,
-        append: 'after',
+        anchor: `#${e.id} .ad-ext-player-score`,
         onMount: (container: any) => {
           console.log("Autodarts Tools: Gotcha: initialized");
           const app = createApp(Gotcha, { playerIndex: index });

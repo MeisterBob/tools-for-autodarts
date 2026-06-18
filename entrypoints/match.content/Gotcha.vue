@@ -60,6 +60,9 @@ function calculateDartThrow(targetScore: number): number | string {
 
 <style>
 .gotcha {
+  display: flex;
+  justify-content: center;
+  width: 100%;
   font-size: 3em;
   font-weight: 600;
   margin-top: 0;
