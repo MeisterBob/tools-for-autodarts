@@ -178,7 +178,7 @@ async function processGameData(gameData: IGameData): Promise<void> {
 /**
  * Get animation URL for a trigger, selecting randomly from matching animations
  */
-async function getAnimationUrl(trigger: string): Promise<string | null> {
+async function getAnimationUrl(trigger: string): Promise<IAnimation | null> {
   if (!config.value?.animations?.data || config.value.animations.data.length === 0) {
     return null;
   }
@@ -224,10 +224,13 @@ async function getAnimationUrl(trigger: string): Promise<string | null> {
     const fromCache = animationCache.value[selectedAnimation.animationId];
     if (fromCache) return fromCache;
 
-    return await loadAnimationFromOPFS(selectedAnimation.animationId);
+    return {
+      url: await loadAnimationFromOPFS(selectedAnimation.animationId),
+      duration: selectedAnimation.duration
+    } as IAnimation;
   }
 
-  return selectedAnimation.url;
+  return selectedAnimation;
 }
 
 /**
@@ -277,10 +280,10 @@ async function playAnimation(trigger: string): Promise<void> {
     const delayStart = (config.value?.animations?.delayStart || 1) * 1000;
 
     // Get duration from config (default to 5 second if not set)
-    const duration = (config.value?.animations?.duration || 5) * 1000;
+    const duration = (animation.duration === 0 ? (config.value?.animations?.duration || 5) : animation.duration) * 1000;
 
     // Set the animation URL
-    currentAnimationUrl.value = animationUrl;
+    currentAnimationUrl.value = animation.url;
 
     // Delay the start of the animation
     setTimeout(() => {
