@@ -208,6 +208,25 @@
           </p>
         </div>
 
+        <div>
+          <label for="animation-duration" class="mb-1 block text-sm font-medium text-white">
+            Animation Duration in ms
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-3 flex items-center text-white/60">
+              <span class="icon-[pixelarticons--clock]" />
+            </span>
+            <AppInput
+              id="animation-duration"
+              @update:model-value="val => newAnimation.duration = val ? Number(val) : null"
+              :model-value="newAnimation.duration ? String(newAnimation.duration) : ''"
+              type="number"
+              :placeholder="`${(config!.animations.duration || 0) * 1000}`"
+              class="pl-9"
+            />
+          </div>
+        </div>
+
         <hr class="border-white/20">
 
         <div>
@@ -435,8 +454,11 @@ import AppToggle from "../AppToggle.vue";
 import AppMultiSelect from "../AppMultiSelect.vue";
 
 import { useNotification } from "@/composables/useNotification";
-import { deleteAnimationFromOPFS, getAnimationFromOPFS, getAnimationNameFromOPFS, isOPFSAvailable, saveAnimationToOPFS, validateAnimationTriggers } from "@/utils/helpers";
+import { backgroundFetch, deleteAnimationFromOPFS, getAnimationFromOPFS, getAnimationNameFromOPFS, isOPFSAvailable, saveAnimationToOPFS, validateAnimationTriggers } from "@/utils/helpers";
 import { AutodartsToolsConfig, type IAnimation, type IConfig, defaultConfig } from "@/utils/storage";
+
+import { createLogger } from "@/utils/logger";
+const { log_dbg, log_inf, log_wrn, log_err } = createLogger("Animations");
 
 const emit = defineEmits([ "toggle", "settingChange" ]);
 const { notification, showNotification, hideNotification } = useNotification();
@@ -445,10 +467,11 @@ const config = ref<IConfig>();
 const imageUrl = browser.runtime.getURL("/images/animations.png");
 const showAnimationModal = ref(false);
 const isEditMode = ref(false);
-const newAnimation = ref<{ url: string; text: string; animationId: string | null }>({
+const newAnimation = ref<{ url: string; text: string; animationId: string | null; duration: number | null }>({
   url: "",
   text: "",
   animationId: null,
+  duration: null,
 });
 const allowAdd = ref(false);
 const editingIndex = ref<number | null>(null);
@@ -543,7 +566,7 @@ async function loadAnimationSource(animation: IAnimation) {
         return;
       }
     } catch (error) {
-      console.error("Error loading animation from OPFS:", error);
+      log_err("Error loading animation from OPFS:", error);
     }
   }
   // Fallback to URL if animation is not stored in OPFS
@@ -623,7 +646,7 @@ watch(config, async (_, oldValue) => {
 
   await AutodartsToolsConfig.setValue(toRaw(config.value ?? defaultConfig));
   emit("settingChange");
-  console.log("Animations setting changed");
+  log_inf("Animations setting changed");
 }, { deep: true });
 
 function initSortable() {
@@ -681,6 +704,41 @@ function toggleAnimationEnabled(index: number) {
   config.value.animations.data[index].enabled = !config.value.animations.data[index].enabled;
 }
 
+async function getGifDurationFromUrl(url) {
+  try {
+    const response = await backgroundFetch(url);
+    if (!response.ok || !response.data) {
+      log_err(`fetching ${url} failed`, response);
+      return 0;
+    }
+    let uint8: Uint8Array;
+    
+    if (response.data.startsWith("data:image/gif;base64,")) {
+      const base64String = response.data.slice("data:image/gif;base64,".length);
+      const binaryString = atob(base64String);
+      uint8 = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        uint8[i] = binaryString.charCodeAt(i);
+      }
+    } else {
+      const buffer = new TextEncoder().encode(response.data);
+      uint8 = new Uint8Array(buffer);
+    }
+
+    let duration:number = 0;
+    for (let i = 0; i < uint8.length - 4; i++) {
+      if (uint8[i] === 0x21 && uint8[i + 1] === 0xF9 && uint8[i + 2] === 0x04) {
+        const delay = (uint8[i + 4] + (uint8[i + 5] << 8)) * 10;
+        duration += delay;
+      }
+    }
+    return duration;
+  } catch (error) {
+    log_err("Error calculating GIF duration:", error);
+    return null;
+  }
+}
+
 async function editAnimation(index: number) {
   if (!config.value || !config.value.animations.data[index]) return;
 
@@ -695,12 +753,18 @@ async function editAnimation(index: number) {
     uploadedGifFilename.value = name || "unknown";
   }
 
+  let duration: number | null = animation.duration * 1000;
+  if (animation.url && animation.duration === 0) {
+    duration = await getGifDurationFromUrl(animation.url) || null;
+  }
+
   newAnimation.value = {
     url: animation.url || "",
     text: Array.isArray(animation.triggers)
       ? animation.triggers.join("\n")
       : "",
     animationId: animation.animationId || null,
+    duration: duration,
   };
   isEditMode.value = true;
   editingIndex.value = index;
@@ -757,6 +821,7 @@ function saveAnimation() {
     triggers: validTriggers, // Use the validated triggers
     enabled: true, // New animations are enabled by default
     animationId: newAnimation.value.animationId ?? undefined,
+    duration: (newAnimation.value.duration || 0) / 1000,
   };
 
   if (isEditMode.value && editingIndex.value !== null) {
@@ -770,7 +835,7 @@ function saveAnimation() {
   }
 
   // Reset form and close modal
-  newAnimation.value = { url: "", text: "", animationId: null };
+  newAnimation.value = { url: "", text: "", animationId: null, duration: 0 };
   showAnimationModal.value = false;
   editingIndex.value = null;
 
@@ -779,7 +844,7 @@ function saveAnimation() {
 }
 
 function closeAnimationModal() {
-  newAnimation.value = { url: "", text: "", animationId: null };
+  newAnimation.value = { url: "", text: "", animationId: null, duration: 0 };
   showAnimationModal.value = false;
   editingIndex.value = null;
   isUploadedGif.value = false;
@@ -791,7 +856,7 @@ function removeAnimation(index: number) {
     // If animation is stored in OPFS, delete it
     const animation = config.value.animations.data[index];
     if (animation.animationId && isOPFSAvailable()) {
-      deleteAnimationFromOPFS(animation.animationId).catch(console.error);
+      deleteAnimationFromOPFS(animation.animationId).catch(log_err);
       // Also remove from sources cache
       delete animationSources.value[animation.animationId];
     }
@@ -803,7 +868,7 @@ function removeAnimation(index: number) {
 }
 
 function openAddAnimationModal() {
-  newAnimation.value = { url: "", text: "", animationId: null };
+  newAnimation.value = { url: "", text: "", animationId: null, duration: 0 };
   isEditMode.value = false;
   editingIndex.value = null;
   showAnimationModal.value = true;
@@ -915,6 +980,7 @@ async function processGifFiles() {
           url: "", // Empty URL since we're storing in OPFS
           triggers,
           enabled: true,
+          duration: 0,
         };
 
         // Save to OPFS
@@ -937,7 +1003,7 @@ async function processGifFiles() {
           throw new Error("Failed to save animation to browser storage");
         }
       } catch (error) {
-        console.error(`Error processing file ${file.name}:`, error);
+        log_err(`Error processing file ${file.name}:`, error);
         showNotification(`Failed to process ${file.name}`, "error");
       }
     }
@@ -954,7 +1020,7 @@ async function processGifFiles() {
     // Update intersection observer to detect newly added animations
     updateIntersectionObserverForNewAnimations();
   } catch (error) {
-    console.error("Error processing files:", error);
+    log_err("Error processing files:", error);
     showNotification("Error processing files", "error");
   } finally {
     isGifProcessing.value = false;
@@ -988,7 +1054,7 @@ async function deleteAllAnimations() {
   // Update config
   await AutodartsToolsConfig.setValue(toRaw(config.value));
   emit("settingChange");
-  console.log("Animations setting changed");
+  log_inf("setting changed");
 
   // Close modal and show notification
   closeDeleteAllModal();

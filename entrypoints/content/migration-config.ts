@@ -200,6 +200,13 @@ async function migrateConfig(currentConfigVersion: number) {
         config.soundFx.enabledGameModes = Object.values(GameMode);
         config.wledFx.enabledGameModes = Object.values(GameMode);
         break;
+      case 22:
+        // Migration from version 22 to version 23
+        config.version = 23;
+        config.animations.data.forEach((animation) => {
+          animation.duration = 0;
+        });
+        break;
     }
 
     await AutodartsToolsConfig.setValue(config);
