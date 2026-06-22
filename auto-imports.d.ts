@@ -13,6 +13,7 @@ declare global {
   const $shallowRef: typeof import('vue/macros')['$shallowRef']
   const $toRef: typeof import('vue/macros')['$toRef']
   const EffectScope: typeof import('vue')['EffectScope']
+  const TRIGGER_CATEGORIES: typeof import('./composables/useGameDataProcessor')['TRIGGER_CATEGORIES']
   const TRIGGER_PRIORITIES: typeof import('./composables/useGameDataProcessor')['TRIGGER_PRIORITIES']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
@@ -316,6 +317,6 @@ declare global {
   export type { Component, ComponentPublicInstance, ComputedRef, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { TRIGGER_PRIORITIES } from './composables/useGameDataProcessor'
+  export type { TRIGGER_CATEGORIES, TRIGGER_PRIORITIES } from './composables/useGameDataProcessor'
   import('./composables/useGameDataProcessor')
 }

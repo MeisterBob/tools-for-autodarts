@@ -443,15 +443,12 @@ async function processGameDataFromTriggers(
 
   // Play sounds for each category (only one per category, highest priority)
   const playedCategories = new Set<string>();
+  if (hasGameshot)
+    playedCategories.add("throw").add("total").add("remaining").add("board").add("other");
   for (const trigger of triggers) {
-    // Skip ambient triggers for caller
-    if (trigger.category === "ambient") {
-      continue;
-    }
-
     // Only play the first configured trigger from each category (they're already sorted by priority)
     if (!playedCategories.has(trigger.category) && playSound(trigger.trigger))
-        playedCategories.add(trigger.category);
+      playedCategories.add(trigger.category);
   }
 }
 

@@ -120,7 +120,7 @@ const log = createLogger("GameDataProcessor", { debug: false })
 export interface IGameTrigger {
   trigger: string;
   priority: number;
-  category: "match" | "throw" | "total" | "remaining" | "player" | "board" | "other";
+  category: TRIGGER_CATEGORIES;
 }
 
 /**
@@ -149,6 +149,17 @@ export interface CallbackOptions {
   /** Override priority values for specific triggers. Keys are trigger names or TRIGGER_PRIORITIES enum values */
   priorityOverrides?: Record<string | number, number>;
 }
+
+/** Priority categories */
+export enum TRIGGER_CATEGORIES {
+  MATCH = "match",
+  THROW = "throw",
+  TOTAL = "total",
+  REMAINING = "remaining",
+  PLAYER = "player",
+  BOARD = "board",
+  OTHER = "other"
+};
 
 /** Priority levels (lower = higher priority) */
 export enum TRIGGER_PRIORITIES {
@@ -248,7 +259,7 @@ export function registerGameDataCallback(
     priorityOverrides: options.priorityOverrides ?? {},
   };
   log.info(
-    `Autodarts Tools: GameDataprocessor: Registering game data callback for module: ${moduleId} (sort order: ${finalOptions.sortOrder}, overrides: ${Object.keys(finalOptions.priorityOverrides).length})`,
+    `Registering game data callback for module: ${moduleId} (sort order: ${finalOptions.sortOrder}, overrides: ${Object.keys(finalOptions.priorityOverrides).length})`,
   );
   callbacks.set(moduleId, { callback, options: finalOptions });
 
@@ -273,6 +284,8 @@ async function runCallback(
   oldGameData: IGameData,
   fromWebSocket: boolean
 ): Promise<void> {
+  if (!triggers.length || !gameData.match) return;
+
   // Apply priority overrides to triggers for this module
   const customizedTriggers = triggers.map(trigger => {
     const override = options.priorityOverrides[trigger.trigger] ?? options.priorityOverrides[trigger.priority];
@@ -336,24 +349,25 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
   const currentPlayer = gameData.match.players?.[gameData.match.player];
   const playerName = currentPlayer?.name?.toLowerCase() || "";
   const playerNameUnderscore = playerName.replace(/\s+/g, "_");
+  const isBot = !!currentPlayer?.cpuPPR;
 
   if (winnerMatch) {
     triggers.push({
       trigger: "matchshot",
       priority: TRIGGER_PRIORITIES.MATCHSHOT,
-      category: "match",
+      category: TRIGGER_CATEGORIES.MATCH,
     });
     if (playerName) {
       triggers.push({
         trigger: `matchshot_${playerName}`,
         priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
-        category: "match",
+        category: TRIGGER_CATEGORIES.MATCH,
       });
       if (playerNameUnderscore !== playerName) {
         triggers.push({
           trigger: `matchshot_${playerNameUnderscore}`,
           priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
-          category: "match",
+          category: TRIGGER_CATEGORIES.MATCH,
         });
       }
     }
@@ -362,19 +376,19 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
     triggers.push({
       trigger: "gameshot",
       priority: TRIGGER_PRIORITIES.GAMESHOT,
-      category: "match",
+      category: TRIGGER_CATEGORIES.MATCH,
     });
     if (playerName) {
       triggers.push({
         trigger: `gameshot_${playerName}`,
         priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
-        category: "match",
+        category: TRIGGER_CATEGORIES.MATCH,
       });
       if (playerNameUnderscore !== playerName) {
         triggers.push({
           trigger: `gameshot_${playerNameUnderscore}`,
           priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
-          category: "match",
+          category: TRIGGER_CATEGORIES.MATCH,
         });
       }
     }
@@ -382,35 +396,30 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
 
   // Bull-off handling
   if (gameData.match.variant === GameMode.BULL_OFF) {
-    const currentPlayer = gameData.match.players?.[gameData.match.player];
-    const playerName = currentPlayer?.name?.toLowerCase() || "";
-    const playerNameUnderscore = playerName.replace(/\s+/g, "_");
-    const isBot = !!currentPlayer?.cpuPPR;
-
     if (isBot) {
       triggers.push({
         trigger: "bulloff_bot",
         priority: TRIGGER_PRIORITIES.OTHER,
-        category: "other",
+        category: TRIGGER_CATEGORIES.OTHER,
       });
     } else {
       triggers.push({
         trigger: `bulloff_${playerName}`,
         priority: TRIGGER_PRIORITIES.OTHER,
-        category: "other",
+        category: TRIGGER_CATEGORIES.OTHER,
       });
     }
     if (playerName != playerNameUnderscore) {
       triggers.push({
         trigger: `bulloff_${playerNameUnderscore}`,
         priority: TRIGGER_PRIORITIES.OTHER,
-        category: "other",
+        category: TRIGGER_CATEGORIES.OTHER,
       });
     }
     triggers.push({
       trigger: "bulloff",
       priority: TRIGGER_PRIORITIES.OTHER,
-      category: "other",
+      category: TRIGGER_CATEGORIES.OTHER,
     });
     return triggers;
   }
@@ -422,56 +431,50 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
     oldGameData.match.player !== gameData.match.player;
 
   const isFirstThrow = gameData.match.turns[0].throws.length === 0;
-  if (isFirstThrow || playerChanged) {
-    const currentPlayer = gameData.match.players?.[gameData.match.player];
-    const playerName = currentPlayer?.name?.toLowerCase() || "";
-    const playerNameUnderscore = playerName.replace(/\s+/g, "_");
-    const isBot = !!currentPlayer?.cpuPPR;
-
+  if (isFirstThrow || playerChanged || (winnerMatch || winner)) {
     if (isBot) {
       triggers.push({
         trigger: "bot",
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: "player",
+        category: TRIGGER_CATEGORIES.PLAYER,
       });
       triggers.push({
         trigger: "bot_throw",
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: "player",
+        category: TRIGGER_CATEGORIES.PLAYER,
       });
     } else if (playerName) {
       triggers.push({
         trigger: playerName,
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: "player",
+        category: TRIGGER_CATEGORIES.PLAYER,
       });
       if (playerName != playerNameUnderscore) {
         triggers.push({
           trigger: playerNameUnderscore,
           priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-          category: "player",
+          category: TRIGGER_CATEGORIES.PLAYER,
         });
       }
       triggers.push({
         trigger: `player_${gameData.match.player + 1}`,
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: "player",
+        category: TRIGGER_CATEGORIES.PLAYER,
       });
     }
 
     // gameon trigger for start of match
-    console.log("Autodarts Tools: GameDataProcessor:", playerChanged, gameData.match.round, gameData.match.player);
     if (gameData.match.round === 1 && gameData.match.player === 0) {
       triggers.push({
         trigger: "gameon",
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: "player",
+        category: TRIGGER_CATEGORIES.PLAYER,
       });
     } else if (playerChanged) {
       triggers.push({
         trigger: "next_player",
         priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: "player",
+        category: TRIGGER_CATEGORIES.PLAYER,
       });
     }
   }
@@ -501,24 +504,27 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         triggers.push({
           trigger: "busted",
           priority: TRIGGER_PRIORITIES.BUSTED,
-          category: "throw",
+          category: TRIGGER_CATEGORIES.THROW,
         });
       }
 
       if (isLastThrow && !busted) {
-        // Combined throws (most specific, e.g., "s1_d20_b")
+        // Combined throws (most specific, e.g., "s1_s20_s5")
         triggers.push({
           trigger: combinedThrows,
           priority: TRIGGER_PRIORITIES.COMBINED_THROWS,
-          category: "throw",
+          category: TRIGGER_CATEGORIES.THROW,
         });
 
         // Point total
-        triggers.push({
-          trigger: points.toString(),
-          priority: TRIGGER_PRIORITIES.POINT_TOTAL,
-          category: "total",
-        });
+        const addPoints: boolean = (![GameMode.CRICKET, GameMode.TACTICS].includes(gameData.gameMode) || points > 0);
+        if (addPoints) {
+          triggers.push({
+            trigger: points.toString(),
+            priority: TRIGGER_PRIORITIES.POINT_TOTAL,
+            category: TRIGGER_CATEGORIES.TOTAL,
+          });
+        }
       }
 
       // Score (for caller checkout guide)
@@ -526,7 +532,7 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         triggers.push({
           trigger: `${score}`,
           priority: TRIGGER_PRIORITIES.POINT_REMAINING,
-          category: "remaining",
+          category: TRIGGER_CATEGORIES.REMAINING,
         });
       }
 
@@ -534,7 +540,7 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
       triggers.push({
         trigger: normalizedThrowName,
         priority: TRIGGER_PRIORITIES.INDIVIDUAL_THROW,
-        category: "throw",
+        category: TRIGGER_CATEGORIES.THROW,
       });
 
       // Miss detection
@@ -542,7 +548,7 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         triggers.push({
           trigger: "outside",
           priority: TRIGGER_PRIORITIES.INDIVIDUAL_THROW,
-          category: "throw",
+          category: TRIGGER_CATEGORIES.THROW,
         });
       }
     }
@@ -562,17 +568,17 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
       triggers.push({
         trigger: `yr_${currentScore}`,
         priority: TRIGGER_PRIORITIES.POINT_REMAINING,
-        category: "throw",
+        category: TRIGGER_CATEGORIES.THROW,
       });
       triggers.push({
         trigger: `you_require_${currentScore}`,
         priority: TRIGGER_PRIORITIES.POINT_REMAINING,
-        category: "throw",
+        category: TRIGGER_CATEGORIES.THROW,
       });
       triggers.push({
         trigger: "you_require",
         priority: TRIGGER_PRIORITIES.POINT_REMAINING,
-        category: "throw",
+        category: TRIGGER_CATEGORIES.THROW,
       });
     }
   }
@@ -624,10 +630,22 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
           if (allPlayersClosed) {
             triggers.push({
               trigger: "cricket_miss",
-              priority: TRIGGER_PRIORITIES.OTHER,
-              category: "throw",
+              priority: TRIGGER_PRIORITIES.INDIVIDUAL_THROW,
+              category: TRIGGER_CATEGORIES.THROW,
+            });
+          } else {
+            triggers.push({
+              trigger: "cricket_hit",
+              priority: TRIGGER_PRIORITIES.INDIVIDUAL_THROW,
+              category: TRIGGER_CATEGORIES.THROW,
             });
           }
+        } else if (segmentNumber > 0) {
+          triggers.push({
+            trigger: "cricket_miss",
+            priority: TRIGGER_PRIORITIES.INDIVIDUAL_THROW,
+            category: TRIGGER_CATEGORIES.THROW,
+          });
         }
       }
       break;
@@ -672,7 +690,7 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
         triggers.push({
           trigger: `target${targetField}`,
           priority: TRIGGER_PRIORITIES.POINT_TOTAL,
-          category: "other",
+          category: TRIGGER_CATEGORIES.OTHER,
         });
       }
       break;
@@ -687,7 +705,7 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
         triggers.push({
           trigger: `gotcha`,
           priority: TRIGGER_PRIORITIES.BUSTED,
-          category: "throw",
+          category: TRIGGER_CATEGORIES.THROW,
         });
       }
     }

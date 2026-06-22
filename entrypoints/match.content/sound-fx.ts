@@ -6,6 +6,7 @@ import {
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import type { IGameData } from "@/utils/game-data-storage";
+import { TRIGGER_CATEGORIES } from "@/composables/useGameDataProcessor";
 import { createLogger } from "@/utils/logger";
 const log = createLogger("Sound FX")
 
@@ -533,7 +534,8 @@ async function processGameDataFromTriggers(
   }
 
   for (const trigger of triggers)
-    playSound(trigger.trigger)
+    if (playSound(trigger.trigger) && trigger.category === TRIGGER_CATEGORIES.MATCH)
+      return;
 }
 
 /**
@@ -543,7 +545,7 @@ async function processGameDataFromTriggers(
 function playSound(trigger: string, soundChannel: number = 1): boolean {
   if (!config?.soundFx?.sounds || !config.soundFx.sounds.length) {
     log.info("No sounds configured");
-    return;
+    return false;
   }
 
   // Find all sounds that match the trigger
@@ -907,7 +909,7 @@ function playWithAvailableSource(
         log.info(`URL sound playing successfully (channel ${channel})`);
       })
       .catch((error) => {
-        log.error(`Error playing URL sound(channel ${ channel })`, error);
+        log.error(`Error playing URL sound(channel ${channel})`, error);
 
         // Check if the error is due to user interaction requirement
         if (
@@ -929,7 +931,7 @@ function playWithAvailableSource(
                 log.info(`Successfully loaded sound from IndexedDB (channel ${channel})`);
                 playBase64Sound(base64, channel);
               } else {
-                log.error(`Failed to load sound from IndexedDB(channel ${ channel })`);
+                log.error(`Failed to load sound from IndexedDB(channel ${channel})`);
                 // Try base64 if available as final fallback
                 if (nextSound.base64) {
                   playBase64Sound(nextSound.base64, channel);
@@ -940,7 +942,7 @@ function playWithAvailableSource(
               }
             })
             .catch((error) => {
-              log.error(`Error loading sound from IndexedDB(channel ${ channel })`, error);
+              log.error(`Error loading sound from IndexedDB(channel ${channel})`, error);
               // Try base64 if available as final fallback
               if (nextSound.base64) {
                 playBase64Sound(nextSound.base64, channel);
@@ -966,7 +968,7 @@ function playWithAvailableSource(
           log.info(`Successfully loaded sound from IndexedDB (channel ${channel})`);
           playBase64Sound(base64, channel);
         } else {
-  log.error(`Failed to load sound from IndexedDB (channel ${channel})`);
+          log.error(`Failed to load sound from IndexedDB(channel ${channel})`);
           // Fall back to base64 if available
           if (nextSound.base64) {
             playBase64Sound(nextSound.base64, channel);
@@ -977,7 +979,7 @@ function playWithAvailableSource(
         }
       })
       .catch((error) => {
-  log.error(`Error loading sound from IndexedDB (channel ${channel})`, error);
+        log.error(`Error loading sound from IndexedDB(channel ${channel})`, error);
         // Fall back to base64 if available
         if (nextSound.base64) {
           playBase64Sound(nextSound.base64, channel);
@@ -989,7 +991,7 @@ function playWithAvailableSource(
   } else if (nextSound.base64) { // If no URL or soundId, try base64
     playBase64Sound(nextSound.base64, channel);
   } else {
-  log.error(`Sound has neither URL, soundId, nor base64 data (channel ${channel})`);
+    log.error(`Sound has neither URL, soundId, nor base64 data(channel ${channel})`);
     // Move to next sound
     playNextSound(channel);
   }
@@ -1006,7 +1008,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
     const audioUrl = createAudioBlobUrl(base64Data);
 
     if (!audioUrl) {
-      log.error(`Failed to create audio blob URL(channel ${ channel })`);
+      log.error(`Failed to create audio blob URL(channel ${channel})`);
       playNextSound(channel);
       return;
     }
@@ -1019,7 +1021,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
 
     // Make sure the audio element exists
     if (!audioElement) {
-      log.error(`Audio element not found in pool for base64(channel ${ channel })`);
+      log.error(`Audio element not found in pool for base64(channel ${channel})`);
       URL.revokeObjectURL(audioUrl);
       const index = blobUrlsToRevoke.indexOf(audioUrl);
       if (index > -1) {
@@ -1048,7 +1050,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
         log.info(`Base64 sound playing successfully (channel ${channel})`);
       })
       .catch((error) => {
-  log.error(`Base64 sound playback failed (channel ${channel})`, error);
+        log.error(`Base64 sound playback failed(channel ${channel})`, error);
 
         // Check if error is due to user interaction requirement
         if (
@@ -1068,7 +1070,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
         playNextSound(channel);
       });
   } catch (error) {
-  log.error(`Error processing base64 data (channel ${channel})`, error);
+    log.error(`Error processing base64 data(channel ${channel})`, error);
     playNextSound(channel);
   }
 }
