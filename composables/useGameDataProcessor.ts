@@ -1,5 +1,6 @@
 import { type IGameData, GameMode } from "@/utils/game-data-storage";
 import { AutodartsToolsGameData } from "@/utils/game-data-storage";
+const log = createLogger("GameDataProcessor", { debug: false })
 
 /**
  * # GameDataProcessor Documentation
@@ -185,13 +186,13 @@ const callbacks: Map<string, RegisteredCallback> = new Map();
 export async function initGameDataProcessor(): Promise<void> {
   // If already initialized, return immediately
   if (gameDataWatcherUnwatch) {
-    console.log("Autodarts Tools: GameDataprocessor: already initialized");
+    log.info("already initialized");
     return;
   }
 
   // If initialization is in progress, wait for it
   if (initializationPromise) {
-    console.log("Autodarts Tools: GameDataprocessor: initialization in progress, waiting...");
+    log.info("initialization in progress, waiting...");
     return initializationPromise;
   }
 
@@ -204,14 +205,14 @@ export async function initGameDataProcessor(): Promise<void> {
  * Actual initialization logic
  */
 async function performInitialization(): Promise<void> {
-  console.log("Autodarts Tools: GameDataprocessor: Initializing");
+  log.info("Initializing");
 
   const initialGameData = await AutodartsToolsGameData.getValue();
   oldGameData = initialGameData;
 
   gameDataWatcherUnwatch = AutodartsToolsGameData.watch(
     (gameData: IGameData) => {
-      console.log("Autodarts Tools: GameDataprocessor: gameData incomming:", gameData);
+      log.info("gameData incomming:", gameData);
       processGameData(gameData, oldGameData!, true);
       oldGameData = gameData;
     },
@@ -246,7 +247,7 @@ export function registerGameDataCallback(
     sortOrder: options.sortOrder ?? "asc",
     priorityOverrides: options.priorityOverrides ?? {},
   };
-  console.log(
+  log.info(
     `Autodarts Tools: GameDataprocessor: Registering game data callback for module: ${moduleId} (sort order: ${finalOptions.sortOrder}, overrides: ${Object.keys(finalOptions.priorityOverrides).length})`,
   );
   callbacks.set(moduleId, { callback, options: finalOptions });
@@ -260,7 +261,7 @@ export function registerGameDataCallback(
  * Unregister a callback
  */
 export function unregisterGameDataCallback(moduleId: string): void {
-  console.log(`Autodarts Tools: GameDataprocessor: Unregistering game data callback for module: ${moduleId}`);
+  log.info(`Unregistering game data callback for module: ${moduleId}`);
   callbacks.delete(moduleId);
 }
 
@@ -308,7 +309,7 @@ async function processGameData(
   triggers.forEach((trigger) => {
     triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
   });
-  console.log("Autodarts Tools: GameDataprocessor: found triggers:", triggers_list);
+  log.info("found triggers:", triggers_list);
 
   // Call all registered callbacks, applying priority overrides and sorting according to each module's preference
   const callbackPromises = Array.from(callbacks.entries()).map(([_moduleId, { callback, options }]) => {
@@ -588,14 +589,14 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
   if (!gameData.match)
     return triggers;
 
-  console.log("Autodarts Tools: GameDataprocessor:", gameData);
+  log.info(gameData);
   switch (gameData.match.variant) {
     case GameMode.CRICKET:
     case GameMode.TACTICS: {
-      console.log("Autodarts Tools: GameDataprocessor: deriveVariantSpecificTriggers: Cricket");
+      log.info("deriveVariantSpecificTriggers: Cricket");
       // Cricket-specific triggers
       const latestThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
-      console.log("Autodarts Tools: GameDataprocessor:", latestThrow);
+      log.info(latestThrow);
       if (latestThrow) {
         const segmentName = latestThrow.segment.name.toLowerCase();
         let segmentNumber = 0;
@@ -692,7 +693,7 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
     }
   }
 
-  console.log("Autodarts Tools: GameDataprocessor: deriveVariantSpecificTriggers: Triggers:", triggers);
+  log.info("deriveVariantSpecificTriggers: Triggers:", triggers);
 
   return triggers;
 }

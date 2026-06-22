@@ -6,6 +6,8 @@ import {
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import type { IGameData } from "@/utils/game-data-storage";
+import { createLogger } from "@/utils/logger";
+const log = createLogger("Sound FX")
 
 let gameDataProcessorUnwatch: (() => void) | null = null;
 let lobbyDataWatcherUnwatch: any;
@@ -73,11 +75,11 @@ function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
 }
 
 export async function soundFx() {
-  console.log("Autodarts Tools: Sound FX");
+  log.info();
 
   try {
     config = await AutodartsToolsConfig.getValue();
-    console.log("Autodarts Tools: Sound FX: Config loaded", config?.soundFx?.sounds?.length || 0, "sounds available");
+    log.info("Config loaded", config?.soundFx?.sounds?.length || 0, "sounds available");
 
     // Initialize audio player for Safari compatibility
     initAudioPlayer();
@@ -123,7 +125,7 @@ export async function soundFx() {
         // Check if "Time to ready up" text appears in the DOM
         const bodyText = document.body.textContent || document.body.innerText;
         if (bodyText.includes("Time to ready up") || bodyText.includes("Zeit zum bereitmachen") || bodyText.includes("Tijd om je klaar te maken")) {
-          console.log("Autodarts Tools: Sound FX: Found 'Time to ready up' text, playing tournament ready sound");
+          log.info("Found 'Time to ready up' text, playing tournament ready sound");
           playSound("ambient_tournament_ready");
 
           // Disconnect the observer after playing the sound once
@@ -142,12 +144,12 @@ export async function soundFx() {
       });
     }
   } catch (error) {
-    console.error("Autodarts Tools: Sound FX: soundFx initialization error", error);
+    log.error("soundFx initialization error", error);
   }
 }
 
 export function soundFxOnRemove() {
-  console.log("Autodarts Tools: Sound FX: on remove");
+  log.info("on remove");
 
   if (gameDataProcessorUnwatch) {
     gameDataProcessorUnwatch();
@@ -210,7 +212,7 @@ export function soundFxOnRemove() {
     try {
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("Autodarts Tools: Sound FX: Error revoking URL", e);
+      log.error("Error revoking URL", e);
     }
   });
   blobUrlsToRevoke.length = 0;
@@ -231,7 +233,7 @@ function initAudioPlayer(): void {
 
     // Handle errors
     audioPlayer.addEventListener("error", (e) => {
-      console.error("Autodarts Tools: Sound FX: Audio playback error", e);
+      log.error("Audio playback error", e);
       // Move to next sound on error
       playNextSound(1);
     });
@@ -240,11 +242,11 @@ function initAudioPlayer(): void {
     for (let i = 0; i < AUDIO_POOL_SIZE; i++) {
       const audio = new Audio();
       audio.addEventListener("ended", () => {
-        console.log("Autodarts Tools: Sound FX: Pool audio ended");
+        log.info("Pool audio ended");
         playNextSound(1);
       });
       audio.addEventListener("error", (error) => {
-        console.error("Autodarts Tools: Sound FX: Pool audio error", error);
+        log.error("Pool audio error", error);
         document.addEventListener("click", unlockAudio, { once: true });
         document.addEventListener("touchstart", unlockAudio, { once: true });
         document.addEventListener("keydown", unlockAudio, { once: true });
@@ -261,7 +263,7 @@ function initAudioPlayer(): void {
 
     // Handle errors for second player
     audioPlayer2.addEventListener("error", (e) => {
-      console.error("Autodarts Tools: Sound FX: Audio playback error (channel 2)", e);
+      log.error("Audio playback error (channel 2)", e);
       // Move to next sound on error
       playNextSound(2);
     });
@@ -270,11 +272,11 @@ function initAudioPlayer(): void {
     for (let i = 0; i < AUDIO_POOL_SIZE; i++) {
       const audio = new Audio();
       audio.addEventListener("ended", () => {
-        console.log("Autodarts Tools: Sound FX: Pool audio ended (channel 2)");
+        log.info("Pool audio ended (channel 2)");
         playNextSound(2);
       });
       audio.addEventListener("error", (error) => {
-        console.error("Autodarts Tools: Sound FX: Pool audio error (channel 2)", error);
+        log.error("Pool audio error (channel 2)", error);
         document.addEventListener("click", unlockAudio, { once: true });
         document.addEventListener("touchstart", unlockAudio, { once: true });
         document.addEventListener("keydown", unlockAudio, { once: true });
@@ -296,7 +298,7 @@ function initAudioPlayer(): void {
 function unlockAudio(): void {
   if ((audioUnlocked && audioUnlocked2) || (!audioPlayer && !audioPlayer2)) return;
 
-  console.log("Autodarts Tools: Sound FX: Attempting to unlock audio");
+  log.info("Attempting to unlock audio");
 
   const silentAudio = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
@@ -311,13 +313,13 @@ function unlockAudio(): void {
       audio.volume = 1;
       // Don't play them all, just load them
       if (i === 0) {
-        audio.play().catch(e => console.error("Autodarts Tools: Sound FX: Error unlocking pool audio", e));
+        audio.play().catch(e => log.error("Error unlocking pool audio", e));
       }
     });
 
     audioPlayer.play()
       .then(() => {
-        console.log("Autodarts Tools: Sound FX: Audio unlocked successfully");
+        log.info("Audio unlocked successfully");
         audioUnlocked = true;
         hideInteractionNotification();
 
@@ -327,7 +329,7 @@ function unlockAudio(): void {
         }
       })
       .catch((error) => {
-        console.error("Autodarts Tools: Sound FX: Failed to unlock audio", error);
+        log.error("Failed to unlock audio", error);
       });
   }
 
@@ -342,13 +344,13 @@ function unlockAudio(): void {
       audio.volume = 1;
       // Don't play them all, just load them
       if (i === 0) {
-        audio.play().catch(e => console.error("Autodarts Tools: Sound FX: Error unlocking pool audio (channel 2)", e));
+        audio.play().catch(e => log.error("Error unlocking pool audio (channel 2)", e));
       }
     });
 
     audioPlayer2.play()
       .then(() => {
-        console.log("Autodarts Tools: Sound FX: Audio channel 2 unlocked successfully");
+        log.info("Audio channel 2 unlocked successfully");
         audioUnlocked2 = true;
         hideInteractionNotification();
 
@@ -358,7 +360,7 @@ function unlockAudio(): void {
         }
       })
       .catch((error) => {
-        console.error("Autodarts Tools: Sound FX: Failed to unlock audio channel 2", error);
+        log.error("Failed to unlock audio channel 2", error);
       });
   }
 }
@@ -517,14 +519,14 @@ async function processGameDataFromTriggers(
   triggers.forEach((trigger) => {
     triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
   });
-  console.log("Autodarts Tools: Sound FX: processing triggers", triggers_list);
+  log.info("processing triggers", triggers_list);
 
   // Handle gameshot/matchshot cooldown
   const hasGameshot = triggers.some(t => t.trigger === "gameshot" || t.trigger === "matchshot");
   if (hasGameshot) {
     const now = Date.now();
     if (now - lastGameshotTimestamp < GAMESHOT_COOLDOWN_MS) {
-      console.log("Autodarts Tools: Sound FX: Skipping gameshot/matchshot sound due to cooldown");
+      log.info("Skipping gameshot/matchshot sound due to cooldown");
       return;
     }
     lastGameshotTimestamp = now;
@@ -540,7 +542,7 @@ async function processGameDataFromTriggers(
  */
 function playSound(trigger: string, soundChannel: number = 1): boolean {
   if (!config?.soundFx?.sounds || !config.soundFx.sounds.length) {
-    console.log("Autodarts Tools: Sound FX: No sounds configured");
+    log.info("No sounds configured");
     return;
   }
 
@@ -566,7 +568,7 @@ function playSound(trigger: string, soundChannel: number = 1): boolean {
         const { min, max, original } = rangeTrigger;
         const matches = triggerNum >= min && triggerNum <= max;
         if (matches) {
-          console.log(`Autodarts Tools: Sound FX: Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
+          log.info(`Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
         }
         return matches;
       });
@@ -578,7 +580,7 @@ function playSound(trigger: string, soundChannel: number = 1): boolean {
   });
 
   if (!matchingSounds.length) {
-    console.log(`Autodarts Tools: Sound FX: No sound found for trigger "${trigger}" (channel ${soundChannel})`);
+    log.info(`No sound found for trigger "${trigger}" (channel ${soundChannel})`);
     return false;
   }
 
@@ -587,17 +589,17 @@ function playSound(trigger: string, soundChannel: number = 1): boolean {
   const randomIndex = Math.floor(Math.random() * matchingSounds.length);
   const soundToPlay = matchingSounds[randomIndex];
 
-  console.log(`Autodarts Tools: Sound FX: Found matching sound ${soundToPlay.name} (channel ${soundChannel})`);
+  log.info(`Found matching sound for "${trigger}" "${soundToPlay.name}" (channel ${soundChannel})`);
 
   // Check if there's a soundId that we need to load from IndexedDB
   if (soundToPlay.soundId && isIndexedDBAvailable()) {
-    console.log(`Autodarts Tools: Sound FX: Loading sound from IndexedDB ${soundToPlay.soundId} (channel ${soundChannel})`);
+    log.info(`Loading sound from IndexedDB ${soundToPlay.soundId} (channel ${soundChannel})`);
 
     // Get the sound from IndexedDB and play it
     getSoundFxFromIndexedDB(soundToPlay.soundId)
       .then((base64) => {
         if (base64) {
-          console.log(`Autodarts Tools: Sound FX: Successfully loaded sound from IndexedDB (channel ${soundChannel})`);
+          log.info(`Successfully loaded sound from IndexedDB (channel ${soundChannel})`);
           // Add to queue
           if (soundChannel === 2) {
             soundQueue2.push({
@@ -623,7 +625,7 @@ function playSound(trigger: string, soundChannel: number = 1): boolean {
             }
           }
         } else {
-          console.error("Autodarts Tools: Sound FX: Failed to load sound from IndexedDB");
+          log.error("Failed to load sound from IndexedDB");
           // Fall back to URL if available
           if (soundToPlay.url) {
             if (soundChannel === 2) {
@@ -653,7 +655,7 @@ function playSound(trigger: string, soundChannel: number = 1): boolean {
         }
       })
       .catch((error) => {
-        console.error("Autodarts Tools: Sound FX: Error loading sound from IndexedDB", error);
+        log.error("Error loading sound from IndexedDB", error);
         // Fall back to URL if available
         if (soundToPlay.url) {
           if (soundChannel === 2) {
@@ -724,7 +726,7 @@ function playSound(trigger: string, soundChannel: number = 1): boolean {
  */
 function playTTSSound(tts: ISoundTTS, channel: number): void {
   if (!window.speechSynthesis) {
-    console.error("Autodarts Tools: Sound FX: speechSynthesis not available");
+    log.error("speechSynthesis not available");
     playNextSound(channel);
     return;
   }
@@ -745,19 +747,19 @@ function playTTSSound(tts: ISoundTTS, channel: number): void {
 
   // Safety timeout for iOS (10 seconds)
   const safetyTimeout = setTimeout(() => {
-    console.warn("Autodarts Tools: Sound FX: TTS safety timeout reached");
+    log.warn("TTS safety timeout reached");
     speechSynthesis.cancel();
     playNextSound(channel);
   }, 10000);
 
   utterance.onend = () => {
     clearTimeout(safetyTimeout);
-    console.log("Autodarts Tools: Sound FX: TTS playback ended");
+    log.info("TTS playback ended");
     playNextSound(channel);
   };
   utterance.onerror = (e) => {
     clearTimeout(safetyTimeout);
-    console.error("Autodarts Tools: Sound FX: TTS playback error", e);
+    log.error("TTS playback error", e);
     playNextSound(channel);
   };
 
@@ -766,10 +768,10 @@ function playTTSSound(tts: ISoundTTS, channel: number): void {
 
 function playNextSound(channel: number = 1): void {
   if (channel === 2) {
-    console.log("Autodarts Tools: Sound FX: playNextSound called for channel 2, queue length:", soundQueue2.length);
+    log.info("playNextSound called for channel 2, queue length:", soundQueue2.length);
 
     if (soundQueue2.length === 0) {
-      console.log("Autodarts Tools: Sound FX: Sound queue for channel 2 is empty");
+      log.info("Sound queue for channel 2 is empty");
       isPlaying2 = false;
       return;
     }
@@ -777,16 +779,16 @@ function playNextSound(channel: number = 1): void {
     isPlaying2 = true;
     const nextSound = soundQueue2.shift();
 
-    console.log("Autodarts Tools: Sound FX: Next sound to play on channel 2:", nextSound?.name);
+    log.info("Next sound to play on channel 2:", nextSound?.name);
 
     if (!nextSound) {
-      console.error("Autodarts Tools: Sound FX: nextSound for channel 2 is unexpectedly empty even though queue had items");
+      log.error("nextSound for channel 2 is unexpectedly empty even though queue had items");
       isPlaying2 = false;
       return;
     }
 
     if (!nextSound.url && !nextSound.base64 && !nextSound.soundId && !nextSound.tts) {
-      console.error("Autodarts Tools: Sound FX: Sound for channel 2 has neither URL, base64 data, soundId, nor TTS");
+      log.error("Sound for channel 2 has neither URL, base64 data, soundId, nor TTS");
       // Move to next sound
       playNextSound(2);
       return;
@@ -798,7 +800,7 @@ function playNextSound(channel: number = 1): void {
       return;
     }
 
-    console.log("Autodarts Tools: Sound FX: Playing sound on channel 2");
+    log.info("Playing sound on channel 2");
 
     try {
       // Get the next audio element from the pool
@@ -806,7 +808,7 @@ function playNextSound(channel: number = 1): void {
 
       // Make sure the audio element exists
       if (!audioElement) {
-        console.error("Autodarts Tools: Sound FX: Audio element not found in pool for channel 2");
+        log.error("Audio element not found in pool for channel 2");
         isPlaying2 = false;
         return;
       }
@@ -820,15 +822,15 @@ function playNextSound(channel: number = 1): void {
       // Play based on available source (URL, IndexedDB, or base64)
       playWithAvailableSource(nextSound, audioElement, 2);
     } catch (error) {
-      console.error("Autodarts Tools: Sound FX: Exception while setting up audio for channel 2", error);
+      log.error("Exception while setting up audio for channel 2", error);
       // Move to next sound on error
       playNextSound(2);
     }
   } else {
-    console.log("Autodarts Tools: Sound FX: playNextSound called for channel 1, queue length:", soundQueue.length);
+    log.info("playNextSound called for channel 1, queue length:", soundQueue.length);
 
     if (soundQueue.length === 0) {
-      console.log("Autodarts Tools: Sound FX: Sound queue for channel 1 is empty");
+      log.info("Sound queue for channel 1 is empty");
       isPlaying = false;
       return;
     }
@@ -836,16 +838,16 @@ function playNextSound(channel: number = 1): void {
     isPlaying = true;
     const nextSound = soundQueue.shift();
 
-    console.log("Autodarts Tools: Sound FX: Next sound to play on channel 1:", nextSound?.name);
+    log.info("Next sound to play on channel 1:", nextSound?.name);
 
     if (!nextSound) {
-      console.error("Autodarts Tools: Sound FX: nextSound for channel 1 is unexpectedly empty even though queue had items");
+      log.error("nextSound for channel 1 is unexpectedly empty even though queue had items");
       isPlaying = false;
       return;
     }
 
     if (!nextSound.url && !nextSound.base64 && !nextSound.soundId && !nextSound.tts) {
-      console.error("Autodarts Tools: Sound FX: Sound for channel 1 has neither URL, base64 data, soundId, nor TTS");
+      log.error("Sound for channel 1 has neither URL, base64 data, soundId, nor TTS");
       // Move to next sound
       playNextSound(1);
       return;
@@ -857,7 +859,7 @@ function playNextSound(channel: number = 1): void {
       return;
     }
 
-    console.log("Autodarts Tools: Sound FX: Playing sound on channel 1");
+    log.info("Playing sound on channel 1");
 
     try {
       // Get the next audio element from the pool
@@ -865,7 +867,7 @@ function playNextSound(channel: number = 1): void {
 
       // Make sure the audio element exists
       if (!audioElement) {
-        console.error("Autodarts Tools: Sound FX: Audio element not found in pool for channel 1");
+        log.error("Audio element not found in pool for channel 1");
         isPlaying = false;
         return;
       }
@@ -879,7 +881,7 @@ function playNextSound(channel: number = 1): void {
       // Play based on available source (URL, IndexedDB, or base64)
       playWithAvailableSource(nextSound, audioElement, 1);
     } catch (error) {
-      console.error("Autodarts Tools: Sound FX: Exception while setting up audio for channel 1", error);
+      log.error("Exception while setting up audio for channel 1", error);
       // Move to next sound on error
       playNextSound(1);
     }
@@ -894,7 +896,7 @@ function playWithAvailableSource(
 ): void {
   // Try URL first, then soundId (from IndexedDB), then base64
   if (nextSound.url) {
-    console.log(`Autodarts Tools: Sound FX: Using URL source (channel ${channel})`);
+    log.info(`Using URL source (channel ${channel})`);
 
     // Set the source to the URL
     audioElement.src = nextSound.url;
@@ -902,10 +904,10 @@ function playWithAvailableSource(
     // Play the sound
     audioElement.play()
       .then(() => {
-        console.log(`Autodarts Tools: Sound FX: URL sound playing successfully (channel ${channel})`);
+        log.info(`URL sound playing successfully (channel ${channel})`);
       })
       .catch((error) => {
-        console.error(`Autodarts Tools: Sound FX: Error playing URL sound (channel ${channel})`, error);
+        log.error(`Error playing URL sound(channel ${ channel })`, error);
 
         // Check if the error is due to user interaction requirement
         if (
@@ -919,15 +921,15 @@ function playWithAvailableSource(
 
         // If URL fails and we have soundId or base64, try that as fallback
         if (nextSound.soundId && isIndexedDBAvailable()) {
-          console.log(`Autodarts Tools: Sound FX: Falling back to soundId after URL failure (channel ${channel})`);
+          log.info(`Falling back to soundId after URL failure (channel ${channel})`);
           // Get the sound from IndexedDB and play it
           getSoundFxFromIndexedDB(nextSound.soundId)
             .then((base64) => {
               if (base64) {
-                console.log(`Autodarts Tools: Sound FX: Successfully loaded sound from IndexedDB (channel ${channel})`);
+                log.info(`Successfully loaded sound from IndexedDB (channel ${channel})`);
                 playBase64Sound(base64, channel);
               } else {
-                console.error(`Autodarts Tools: Sound FX: Failed to load sound from IndexedDB (channel ${channel})`);
+                log.error(`Failed to load sound from IndexedDB(channel ${ channel })`);
                 // Try base64 if available as final fallback
                 if (nextSound.base64) {
                   playBase64Sound(nextSound.base64, channel);
@@ -938,7 +940,7 @@ function playWithAvailableSource(
               }
             })
             .catch((error) => {
-              console.error(`Autodarts Tools: Sound FX: Error loading sound from IndexedDB (channel ${channel})`, error);
+              log.error(`Error loading sound from IndexedDB(channel ${ channel })`, error);
               // Try base64 if available as final fallback
               if (nextSound.base64) {
                 playBase64Sound(nextSound.base64, channel);
@@ -948,7 +950,7 @@ function playWithAvailableSource(
               }
             });
         } else if (nextSound.base64) {
-          console.log(`Autodarts Tools: Sound FX: Falling back to base64 after URL failure (channel ${channel})`);
+          log.info(`Falling back to base64 after URL failure (channel ${channel})`);
           playBase64Sound(nextSound.base64, channel);
         } else {
           // Move to next sound
@@ -956,15 +958,15 @@ function playWithAvailableSource(
         }
       });
   } else if (nextSound.soundId && isIndexedDBAvailable()) {
-    console.log(`Autodarts Tools: Sound FX: Using soundId source (channel ${channel})`);
+    log.info(`Using soundId source (channel ${channel})`);
     // Get the sound from IndexedDB and play it
     getSoundFxFromIndexedDB(nextSound.soundId)
       .then((base64) => {
         if (base64) {
-          console.log(`Autodarts Tools: Sound FX: Successfully loaded sound from IndexedDB (channel ${channel})`);
+          log.info(`Successfully loaded sound from IndexedDB (channel ${channel})`);
           playBase64Sound(base64, channel);
         } else {
-          console.error(`Autodarts Tools: Sound FX: Failed to load sound from IndexedDB (channel ${channel})`);
+  log.error(`Failed to load sound from IndexedDB (channel ${channel})`);
           // Fall back to base64 if available
           if (nextSound.base64) {
             playBase64Sound(nextSound.base64, channel);
@@ -975,7 +977,7 @@ function playWithAvailableSource(
         }
       })
       .catch((error) => {
-        console.error(`Autodarts Tools: Sound FX: Error loading sound from IndexedDB (channel ${channel})`, error);
+  log.error(`Error loading sound from IndexedDB (channel ${channel})`, error);
         // Fall back to base64 if available
         if (nextSound.base64) {
           playBase64Sound(nextSound.base64, channel);
@@ -987,7 +989,7 @@ function playWithAvailableSource(
   } else if (nextSound.base64) { // If no URL or soundId, try base64
     playBase64Sound(nextSound.base64, channel);
   } else {
-    console.error(`Autodarts Tools: Sound FX: Sound has neither URL, soundId, nor base64 data (channel ${channel})`);
+  log.error(`Sound has neither URL, soundId, nor base64 data (channel ${channel})`);
     // Move to next sound
     playNextSound(channel);
   }
@@ -997,14 +999,14 @@ function playWithAvailableSource(
  * Play a sound from base64 data
  */
 function playBase64Sound(base64Data: string, channel: number = 1): void {
-  console.log(`Autodarts Tools: Sound FX: Using base64 source (channel ${channel})`);
+  log.info(`Using base64 source (channel ${channel})`);
 
   try {
     // Create a blob URL from the base64 data
     const audioUrl = createAudioBlobUrl(base64Data);
 
     if (!audioUrl) {
-      console.error(`Autodarts Tools: Sound FX: Failed to create audio blob URL (channel ${channel})`);
+      log.error(`Failed to create audio blob URL(channel ${ channel })`);
       playNextSound(channel);
       return;
     }
@@ -1017,7 +1019,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
 
     // Make sure the audio element exists
     if (!audioElement) {
-      console.error(`Autodarts Tools: Sound FX: Audio element not found in pool for base64 (channel ${channel})`);
+      log.error(`Audio element not found in pool for base64(channel ${ channel })`);
       URL.revokeObjectURL(audioUrl);
       const index = blobUrlsToRevoke.indexOf(audioUrl);
       if (index > -1) {
@@ -1043,10 +1045,10 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
     // Play the sound
     audioElement.play()
       .then(() => {
-        console.log(`Autodarts Tools: Sound FX: Base64 sound playing successfully (channel ${channel})`);
+        log.info(`Base64 sound playing successfully (channel ${channel})`);
       })
       .catch((error) => {
-        console.error(`Autodarts Tools: Sound FX: Base64 sound playback failed (channel ${channel})`, error);
+  log.error(`Base64 sound playback failed (channel ${channel})`, error);
 
         // Check if error is due to user interaction requirement
         if (
@@ -1066,7 +1068,7 @@ function playBase64Sound(base64Data: string, channel: number = 1): void {
         playNextSound(channel);
       });
   } catch (error) {
-    console.error(`Autodarts Tools: Sound FX: Error processing base64 data (channel ${channel})`, error);
+  log.error(`Error processing base64 data (channel ${channel})`, error);
     playNextSound(channel);
   }
 }
@@ -1086,7 +1088,7 @@ function createAudioBlobUrl(base64Data: string): string | null {
       if (commaIndex !== -1) {
         rawBase64 = base64Data.substring(commaIndex + 1);
       } else {
-        console.error("Autodarts Tools: Sound FX: Invalid data URL format");
+        log.error("Invalid data URL format");
         return null;
       }
     }
@@ -1108,10 +1110,10 @@ function createAudioBlobUrl(base64Data: string): string | null {
     try {
       binaryString = window.atob(rawBase64);
     } catch (e) {
-      console.error("Autodarts Tools: Sound FX: Base64 decoding failed", e);
+      log.error("Base64 decoding failed", e);
 
       // Log a sample of the problematic string to help with debugging
-      console.error("Autodarts Tools: Sound FX: Problem with base64 string:",
+      log.error("Problem with base64 string:",
         rawBase64.length > 50 ? `${rawBase64.substring(0, 50)}...` : rawBase64);
 
       return null;
@@ -1136,7 +1138,7 @@ function createAudioBlobUrl(base64Data: string): string | null {
     const blob = new Blob([bytes], { type: mimeType });
     return URL.createObjectURL(blob);
   } catch (error) {
-    console.error("Autodarts Tools: Sound FX: Failed to create blob URL", error);
+    log.error("Failed to create blob URL", error);
     return null;
   }
 }
@@ -1144,7 +1146,7 @@ function createAudioBlobUrl(base64Data: string): string | null {
 // Clean up blob URLs periodically to prevent memory leaks
 setInterval(() => {
   if (blobUrlsToRevoke.length > 20) {
-    console.log("Autodarts Tools: Sound FX: Cleaning up blob URLs", blobUrlsToRevoke.length);
+    log.info("Cleaning up blob URLs", blobUrlsToRevoke.length);
     // Keep the 5 most recent URLs (they might still be in use)
     const urlsToKeep = blobUrlsToRevoke.slice(-5);
     const urlsToRemove = blobUrlsToRevoke.slice(0, -5);
@@ -1153,7 +1155,7 @@ setInterval(() => {
       try {
         URL.revokeObjectURL(url);
       } catch (e) {
-        console.error("Autodarts Tools: Sound FX: Error revoking URL", e);
+        log.error("Error revoking URL", e);
       }
     });
 
@@ -1166,7 +1168,7 @@ setInterval(() => {
  * Stops all currently playing sounds and clears the sound queue
  */
 function stopAllSounds(): void {
-  console.log("Autodarts Tools: Sound FX: Stopping all sounds due to edit mode");
+  log.info("Stopping all sounds due to edit mode");
 
   // Clear the sound queues
   soundQueue.length = 0;

@@ -24,6 +24,8 @@ import {
   unregisterGameDataCallback,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
+import { createLogger } from "@/utils/logger";
+const log = createLogger("Animations")
 
 // Constants
 const FADE_DURATION = 300; // ms
@@ -81,7 +83,7 @@ function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
 }
 
 onMounted(async () => {
-  console.log("Autodarts Tools: Animations: mounted");
+  log.info("mounted");
 
   try {
     // Load config
@@ -105,7 +107,7 @@ onMounted(async () => {
         // triggers.forEach((trigger) => {
         //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
         // });
-        // console.log("Autodarts Tools: Animations: processing triggers", triggers_list)
+        // log.info("processing triggers", triggers_list)
 
         // For animations, we only want to play the highest priority trigger
         // since we can only show one animation at a time
@@ -121,7 +123,7 @@ onMounted(async () => {
       gameDataProcessorUnwatch = () => unregisterGameDataCallback("animations");
     }
   } catch (error) {
-    console.error("Autodarts Tools: Animations: initialization error", error);
+    log.error("initialization error", error);
   }
 });
 
@@ -231,7 +233,7 @@ async function getAnimationUrl(trigger: string): Promise<string | null> {
  */
 async function loadAnimationFromOPFS(animationId: string): Promise<string | null> {
   if (!isOPFSAvailable()) {
-    console.error("Autodarts Tools: Animations: OPFS not available, cannot load animation", animationId);
+    log.error("OPFS not available, cannot load animation", animationId);
     return null;
   }
 
@@ -243,7 +245,7 @@ async function loadAnimationFromOPFS(animationId: string): Promise<string | null
       return objectURL;
     }
   } catch (error) {
-    console.error("Autodarts Tools: Animations: Error loading animation from OPFS:", error);
+    log.error("Error loading animation from OPFS:", error);
   }
 
   return null;
@@ -256,7 +258,7 @@ async function playAnimation(animationUrl: string): Promise<void> {
   try {
     if (!animationUrl) return;
 
-    console.log("Autodarts Tools: Animations: Playing animation", animationUrl);
+    log.info("Playing animation", animationUrl);
 
     // Update the board position before showing animation
     updateBoardPosition();
@@ -292,7 +294,7 @@ async function playAnimation(animationUrl: string): Promise<void> {
       }, duration);
     }, delayStart);
   } catch (error) {
-    console.error("Autodarts Tools: Animations: Play error", error);
+    log.error("Play error", error);
   }
 }
 

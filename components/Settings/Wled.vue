@@ -431,6 +431,9 @@ import { AutodartsToolsConfig, type IConfig, type IWled } from "@/utils/storage"
 import { setEffect } from "@/entrypoints/match.content/wled";
 import { WledType } from "#imports";
 
+import { createLogger } from "@/utils/logger";
+const log = createLogger("WLED")
+
 const emit = defineEmits(["toggle", "settingChange"]);
 useStorage("adt:active-settings", "wled-fx");
 
@@ -516,7 +519,7 @@ watch(config, async (_, oldValue) => {
 
   await AutodartsToolsConfig.setValue(toRaw(config.value!));
   emit("settingChange");
-  console.log("Autodarts Tools: WLED: setting changed");
+  log.info("setting changed");
 }, { deep: true });
 
 // Initialize Sortable.js
@@ -648,13 +651,13 @@ async function processCSV() {
 }
 
 async function fetchPresets() {
-  console.log("Autodarts Tools: WLED: fetchPresets");
+  log.info("fetchPresets");
   try {
     const presetUrl = (newEffect.value.url.startsWith('http') ? '' : 'http://')
       + newEffect.value.url
       + (newEffect.value.url.endsWith('/') ? '' :'/')
       + 'presets.json';
-    console.log("Autodarts Tools: WLED: loading presets from", presetUrl);
+    log.info("loading presets from", presetUrl);
     availablePresetsOptions.value = [{ value: newEffect.value.preset, label: 'failed to fetch presets' }];
     window.fetch(presetUrl)
       .then((resp) => resp.json())
@@ -666,11 +669,11 @@ async function fetchPresets() {
             availablePresetsOptions.value.push({ value: id, label: `[${id}] ${preset.n}` });
           });
         } else {
-          console.error('Autodarts Tools: WLED: Invalid response format. Expected an object.', data);
+          log.error('Invalid response format. Expected an object.', data);
         }
       });
   } catch (error) {
-    console.error('Autodarts Tools: WLED: Error fetching presets:', error);
+    log.error('Error fetching presets:', error);
   }
 }
 

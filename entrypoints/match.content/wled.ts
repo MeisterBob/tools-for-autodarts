@@ -12,6 +12,8 @@ import {
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import { WledType } from "#imports";
+import { createLogger } from "@/utils/logger";
+const log = createLogger("WLED")
 
 let gameDataProcessorUnwatch: (() => void) | null = null;
 let lobbyDataWatcherUnwatch: any;
@@ -43,7 +45,7 @@ async function checkStatus(boardData: IBoard): Promise<void> {
   const boardEvent: string | undefined = boardData.event;
   const boardStatus: string | undefined = boardData.status;
 
-  console.log(`Autodarts Tools: WLED: Board: event '${boardEvent}', status '${boardStatus}'`);
+  log.info(`Board: event '${boardEvent}', status '${boardStatus}'`);
   if ((boardEvent === "Starting" && (boardStatus === "" || boardStatus === "Starting")) ||
     (boardEvent === "start" && boardStatus === ""))
     eventTrigger("board_starting");
@@ -70,15 +72,13 @@ async function checkStatus(boardData: IBoard): Promise<void> {
   else if (boardEvent === "Calibration finished")
     eventTrigger("calibration_finished");
   else
-    console.log(`Autodarts Tools: WLED: Board: event '${boardEvent}' with status '${boardStatus}' was unhandled`);
+    log.info(`Board: event '${boardEvent}' with status '${boardStatus}' was unhandled`);
 }
 
 export async function wledFx() {
-  console.log("Autodarts Tools: WLED: WLED FX");
-
   try {
     config = await AutodartsToolsConfig.getValue();
-    console.log(`Autodarts Tools: WLED: Config loaded, ${config.wledFx?.effects?.length || 0} effects available`);
+    log.info(`Config loaded, ${config.wledFx?.effects?.length || 0} effects available`);
 
     // Register with centralized game data processor (only once)
     if (!gameDataProcessorUnwatch) {
@@ -115,7 +115,7 @@ export async function wledFx() {
 
     if (!boardDataWatcherUnwatch) {
       boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
-        checkStatus(boardData).catch(console.error);
+        checkStatus(boardData).catch(log.error);
       });
     }
 
@@ -126,19 +126,19 @@ export async function wledFx() {
 
           // Check if tournament event is "start" and trigger the tournament_ready effect
           if (tournamentData.event === "start") {
-            console.log("Autodarts Tools: WLED: Tournament start event detected, triggering tournament_ready effect");
+            log.info("Tournament start event detected, triggering tournament_ready effect");
             setEffectByTrigger("tournament_ready");
           }
         },
       );
     }
   } catch (error) {
-    console.error("Autodarts Tools: WLED: wledFx initialization error", error);
+    log.error("wledFx initialization error", error);
   }
 }
 
 export function wledFxOnRemove() {
-  console.log("Autodarts Tools: WLED: wledFx on remove");
+  log.info("wledFx on remove");
 
   if (gameDataProcessorUnwatch) {
     gameDataProcessorUnwatch();
@@ -177,7 +177,7 @@ async function processGameDataFromTriggers(
   // triggers.forEach((trigger) => {
   //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
   // });
-  // console.log("Autodarts Tools: WLED: processing triggers", triggers_list)
+  // log.info("processing triggers", triggers_list)
 
   currentBoardId = gameData.match.players?.[gameData.match.player].boardId;
 
@@ -201,7 +201,7 @@ async function processGameDataFromTriggers(
 
   // Set effect based on the highest priority trigger that is available
   for (const i in triggers) {
-    console.log("Autodarts Tools: WLED: trying", triggers[i].trigger);
+    log.info("trying", triggers[i].trigger);
     if (isTriggerPresent(triggers[i].trigger)) {
       setEffectByTrigger(triggers[i].trigger);
       return;
@@ -217,7 +217,7 @@ function isTriggerPresent(trigger: string): boolean {
     effect => effect.enabled && effect?.triggers.includes(trigger),
   );
   if (present) {
-    console.log("Autodarts Tools: WLED: isTriggerPresent: found trigger", trigger);
+    log.info("isTriggerPresent: found trigger", trigger);
     return present;
   }
 
@@ -249,7 +249,7 @@ export async function setEffectByTrigger(trigger: string, wait: boolean = false)
   if (!config) {
     config = await AutodartsToolsConfig.getValue();
     if (!config.wledFx.effects.length) {
-      console.log("Autodarts Tools: WLED: No effects configured");
+      log.info("No effects configured");
       return;
     }
   }
@@ -281,7 +281,7 @@ export async function setEffectByTrigger(trigger: string, wait: boolean = false)
   }
 
   if (!matchingEffects.length) {
-    console.log(`Autodarts Tools: WLED: No effect found for trigger "${trigger}"`);
+    log.info(`No effect found for trigger "${trigger}"`);
     return;
   }
 
@@ -289,7 +289,7 @@ export async function setEffectByTrigger(trigger: string, wait: boolean = false)
   const randomIndex = Math.floor(Math.random() * matchingEffects.length);
   const nextEffect = matchingEffects[randomIndex];
 
-  console.log(`Autodarts Tools: WLED: Found matching effect ${nextEffect.name}`);
+  log.info(`Found matching effect ${nextEffect.name}`);
   await setEffect(nextEffect, wait);
 }
 
@@ -299,15 +299,15 @@ export async function setEffect(effect: IWled, wait: boolean = false) {
     config = await AutodartsToolsConfig.getValue();
 
   if (config.wledFx.onlyOnce && effect === currentEffect) {
-    console.info("Autodarts Tools: WLED: didn't fetch", effect.url, "because the effect is already active");
+    log.info("didn't fetch", effect.url, "because the effect is already active");
     return;
   }
   if (!effect.url) {
-    console.info("Autodarts Tools: WLED: effect", effect.name, "doesn't have an url");
+    log.info("effect", effect.name, "doesn't have an url");
     return;
   }
   currentEffect = effect;
-  console.info("Autodarts Tools: WLED: fetching", effect.url);
+  log.info("fetching", effect.url);
 
   const controller = new AbortController();
   const data = {
@@ -338,7 +338,7 @@ export async function setEffect(effect: IWled, wait: boolean = false) {
     } catch (e) {
       const error = e as Error;
       if (error.name !== "AbortError") {
-        console.log("Autodarts Tools: WLED: Request failed (non-critical)", error);
+        log.info("Request failed (non-critical)", error);
       }
     }
   } else {
@@ -354,7 +354,7 @@ export async function setEffect(effect: IWled, wait: boolean = false) {
           clearTimeout(timeoutId);
           // Silently ignore errors to prevent interfering with game state
           if (error.name !== "AbortError") {
-            console.log("Autodarts Tools: WLED: Request failed (non-critical)", error);
+            log.info("Request failed (non-critical)", error);
           }
         });
     }, 0);
