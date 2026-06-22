@@ -1,12 +1,14 @@
 import { AutodartsToolsGameData, type IGameData } from "@/utils/game-data-storage";
 import { AutodartsToolsConfig, type IConfig, type ISound, type ISoundTTS } from "@/utils/storage";
-import { getSoundFxFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
+import { getSoundFxFromIndexedDB, getUserIdFromToken, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
 
 let gameDataWatcherUnwatch: any;
 let lobbyDataWatcherUnwatch: any;
 let boardDataWatcherUnwatch: any;
 let tournamentReadyObserver: MutationObserver | null = null;
 let config: IConfig;
+// Cached id of the local user (decoded from the auth token), used to tell own throws from opponent throws
+let localUserId: string | null = null;
 
 // Audio player for Safari compatibility
 let audioPlayer: HTMLAudioElement | null = null;
@@ -680,8 +682,21 @@ async function processGameData(gameData: IGameData, oldGameData: IGameData, from
   const points: number = gameData.match.turns[0].points;
   const combinedThrows: string = gameData.match.turns[0].throws.map(t => t.segment.name.toLowerCase()).join("_");
 
-  if (isBot && gameData.match.turns[0].throws.length > 0 && oldGameData?.match?.turns?.[0]?.throws?.length !== gameData.match.turns[0].throws.length) {
+  const isNewThrow: boolean = gameData.match.turns[0].throws.length > 0
+    && oldGameData?.match?.turns?.[0]?.throws?.length !== gameData.match.turns[0].throws.length;
+
+  if (isBot && isNewThrow) {
     playSound("bot_throw", 2);
+  }
+
+  // Play the opponent_throw sound when a remote opponent (a real player that isn't you) throws a dart.
+  // Bots are covered by bot_throw above, and your own throws are intentionally skipped so this doesn't
+  // double up with the throw sound coming from your physical board.
+  if (isNewThrow && !isBot && currentPlayer?.userId) {
+    if (!localUserId) localUserId = await getUserIdFromToken();
+    if (localUserId && currentPlayer.userId !== localUserId) {
+      playSound("opponent_throw", 2);
+    }
   }
 
   // For non-Cricket variants, use normal sound logic

@@ -2,17 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.3.0] - 2026-06-22
 
 ### Added
 - Added Checkout Guide feature that displays suggested checkout darts in each player's score box
   - Contributed by @MeisterBob
+- Added `opponent_throw` Sound FX trigger that plays when a remote opponent throws a dart
+  - Fires for any real player other than you, so you get throw feedback when playing online without watching the screen
+  - Your own throws are excluded (avoids doubling up with your board's throw sound) and bot throws keep using `bot_throw`
+  - Requested in #170
 
 ### Fixed
 - Fixed authentication token capture for the Autodarts OAuth 2.0 migration (Keycloak shutdown on 2026-06-28)
   - The page no longer hits the Keycloak token endpoint; `auth-cookie.ts` now watches the new auth server endpoints (`https://api.autodarts.io/auth/v1/exchange` and `/auth/v1/refresh`, plus `/auth/v1/token` and `/auth/v1/device/token`) and keeps the legacy Keycloak endpoint for the transition window
   - Added endpoint-agnostic token capture from outgoing `Authorization: Bearer` headers on `fetch` requests (previously only XHR), so the captured token stays valid regardless of which auth server issued it and keeps up with the new 15-minute access-token lifetime
   - No manifest, storage, or API-consumer changes were required — the existing `auth-cookie-available` event flow and `*://api.autodarts.io/*` host permission already cover the new endpoints
+- Fixed Gotcha Helper positioning after an Autodarts DOM update
+  - Re-anchored the helper to the player score element and centered it so it displays correctly again
+  - Contributed by @MeisterBob
 
 ## [2.2.8] - 2026-03-23
 

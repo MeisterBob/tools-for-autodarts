@@ -1,25 +1,23 @@
-# :dart: Tools for Autodarts v2.2.8 :dart:
+# :dart: Tools for Autodarts v2.3.0 :dart:
+
+### :rotating_light: Important — please update before June 28
+Autodarts is migrating its login system and the old auth server **shuts down on June 28, 2026**. This release updates how the extension captures your login token so features that talk to Autodarts (like Quick Correction) keep working afterwards. **Update before June 28 to avoid interruptions** — no action needed beyond updating.
 
 ### :new: What's new
 
-:video_game: **Gotcha Helper**
-Shows how many points the other players are ahead in Gotcha game variant — including the dart throw needed to catch up (e.g. `+15`, `D10`, `T20`, `BULL`).
+:checkered_flag: **Checkout Guide**
+Displays the suggested checkout darts right inside each player's score box, so everyone can see the recommended finish at a glance. Enable it in the Matches tab.
 
-:speaking_head: **Text-to-Speech (TTS)**
-Generate caller and sound FX audio directly from text using your device's built-in voices! Select a voice, adjust speed & pitch, preview before saving — settings are remembered across sessions.
-
-:bulb: **More Board Event Triggers**
-New triggers for Caller, Sound FX, and WLED:
-- Caller & Sound FX: `board_started`, `board_stopped`, `manual_reset_done`, `takeout_finished`, `calibration_started`, `calibration_finished`
-- WLED: `board_starting`, `board_stopping`, `throw`, `last_throw`, `takeout_finished`
+:loud_sound: **New `opponent_throw` Sound FX trigger**
+Plays a sound whenever a remote opponent throws a dart — handy throw feedback when you're playing online and not staring at the screen. Your own throws are skipped (so it won't double up with your board's throw sound), and bots keep using `bot_throw`.
+_(Requested in #170)_
 
 ### :wrench: Fixes
-- Fixed animation triggers playing incorrectly when busted on last throw
-- Fixed Automatic Next Leg countdown not cleaning up properly between legs
-- Fixed WLED CSV import parsing
+- Updated authentication for the Autodarts OAuth 2.0 migration (see above)
+- Fixed the Gotcha Helper position after a recent Autodarts update
 
 ### :handshake: Community
-Thanks to **@MeisterBob** for contributing the Gotcha Helper, WLED board events, and WLED CSV import fix! :tada:
+Thanks to **@MeisterBob** for contributing the Checkout Guide and the Gotcha Helper fix! :tada:
 
 ---
 
