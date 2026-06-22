@@ -3,7 +3,7 @@
  */
 
 export default defineUnlistedScript(() => {
-  console.log("[WebSocket Capture] Starting initialization");
+  console.log("Autodarts Tools: WebSocket Capture: Starting initialization");
 
   try {
     // Get the original data property descriptor
@@ -13,7 +13,7 @@ export default defineUnlistedScript(() => {
     );
 
     if (!property || !property.get) {
-      console.error("[WebSocket Capture] Could not get data property descriptor");
+      console.error("Autodarts Tools: WebSocket Capture: Could not get data property descriptor");
       return;
     }
 
@@ -52,7 +52,7 @@ export default defineUnlistedScript(() => {
           },
         }));
       } catch (error) {
-        console.error("[WebSocket Capture] Error processing message:", error);
+        console.error("Autodarts Tools: WebSocket Capture: Error processing message:", error);
       }
 
       // Return the original message data without trying to modify the property
@@ -90,15 +90,15 @@ export default defineUnlistedScript(() => {
           },
         }));
       } catch (error) {
-        console.error("[WebSocket Capture] Error intercepting send:", error);
+        console.error("Autodarts Tools: WebSocket Capture: Error intercepting send:", error);
       }
 
       // Call the original send method
       return originalSend.call(this, data);
     };
 
-    console.log("[WebSocket Capture] Initialized successfully");
+    console.log("Autodarts Tools: WebSocket Capture: Initialized successfully");
   } catch (error) {
-    console.error("[WebSocket Capture] Initialization failed:", error);
+    console.error("Autodarts Tools: WebSocket Capture: Initialization failed:", error);
   }
 });

@@ -226,6 +226,7 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
         // Merge activated state with existing match data
         AutodartsToolsGameData.setValue({
           ...gameData,
+          gameMode: gameData.match?.variant as GameMode,
           match: gameData.match
             ? {
                 ...gameData.match,
@@ -239,6 +240,7 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
         // Replace entire match data
         AutodartsToolsGameData.setValue({
           ...gameData,
+          gameMode: gameData.match?.variant as GameMode,
           match: data as IMatch,
         });
       }
@@ -284,7 +286,7 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
             AutodartsToolsBoardImages.setValue(boardImages);
           }
         } catch (error) {
-          console.error("Failed to convert blob URL to base64:", error);
+          console.error("Autodarts Tools: Websocket: Failed to convert blob URL to base64:", error);
         }
       }, 500);
 
@@ -315,7 +317,7 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
       break;
     }
     default: {
-      console.log("Unknown channel", channel);
+      console.log("Autodarts Tools: Websocket: Unknown channel", channel);
       // console.log(data);
 
       break;

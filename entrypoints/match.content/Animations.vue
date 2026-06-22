@@ -1,22 +1,13 @@
 <template>
-  <div
-    @click="hideAnimation"
-    v-if="isShowingAnimation"
-    class="fixed z-[180]"
-    :class="animationContainerClasses"
-    :style="animationContainerStyle"
-  >
+  <div @click="hideAnimation" v-if="isShowingAnimation" class="fixed z-[180]"
+    :class="animationContainerClasses" :style="animationContainerStyle">
     <div class="absolute inset-0">
-      <img
-        id="gif-animation"
-        :src="currentAnimationUrl"
-        :class="twMerge(
-          `size-full transition-opacity duration-300`,
-          isFadingIn ? 'opacity-100' : 'opacity-0',
-          isFadingOut ? 'opacity-0' : '',
-          config?.animations?.objectFit === 'contain' ? 'object-contain' : 'object-cover',
-        )"
-      >
+      <img id="gif-animation" :src="currentAnimationUrl" :class="twMerge(
+        `size-full transition-opacity duration-300`,
+        isFadingIn ? 'opacity-100' : 'opacity-0',
+        isFadingOut ? 'opacity-0' : '',
+        config?.animations?.objectFit === 'contain' ? 'object-contain' : 'object-cover',
+      )">
     </div>
   </div>
 </template>
@@ -26,15 +17,20 @@ import { twMerge } from "tailwind-merge";
 
 import type { IGameData } from "@/utils/game-data-storage";
 
-import { AutodartsToolsGameData } from "@/utils/game-data-storage";
 import { getAnimationFromOPFS, isOPFSAvailable, triggerPatterns } from "@/utils/helpers";
 import { AutodartsToolsConfig, type IAnimation } from "@/utils/storage";
+import {
+  registerGameDataCallback,
+  unregisterGameDataCallback,
+  type IGameTrigger,
+} from "@/composables/useGameDataProcessor";
 
 // Constants
 const FADE_DURATION = 300; // ms
 const FADE_IN_DELAY = 50; // ms
 
 let updateInterval: NodeJS.Timeout | null = null;
+let gameDataProcessorUnwatch: (() => void) | null = null;
 
 // State
 const isShowingAnimation = ref(false);
@@ -79,13 +75,11 @@ const animationContainerStyle = computed(() => {
 });
 
 onMounted(async () => {
-  console.log("Autodarts Tools: Animations mounted");
+  console.log("Autodarts Tools: Animations: mounted");
 
   try {
+    // Load config
     config.value = await AutodartsToolsConfig.getValue();
-    AutodartsToolsGameData.watch((gameData: IGameData) => {
-      processGameData(gameData);
-    });
 
     // Update board position
     updateBoardPosition();
@@ -95,8 +89,33 @@ onMounted(async () => {
 
     // Set up an interval to check for board position changes
     updateInterval = setInterval(updateBoardPosition, 1000);
+
+    // Register with centralized game data processor
+    if (!gameDataProcessorUnwatch) {
+      registerGameDataCallback("animations", async (triggers: IGameTrigger[], gameData: IGameData) => {
+        if (!triggers.length || !gameData.match) return;
+
+        // let triggers_list: string = "";
+        // triggers.forEach((trigger) => {
+        //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+        // });
+        // console.log("Autodarts Tools: Animations: processing triggers", triggers_list)
+
+        // For animations, we only want to play the highest priority trigger
+        // since we can only show one animation at a time
+        while (triggers.length) {
+          const trigger: IGameTrigger = triggers.shift() as IGameTrigger;
+          const animationUrl = await getAnimationUrl(trigger.trigger);
+          if (!animationUrl)
+            continue;
+          await playAnimation(animationUrl);
+          break;
+        }
+      });
+      gameDataProcessorUnwatch = () => unregisterGameDataCallback("animations");
+    }
   } catch (error) {
-    console.error("Autodarts Tools: Animation initialization error", error);
+    console.error("Autodarts Tools: Animations: initialization error", error);
   }
 });
 
@@ -108,6 +127,12 @@ onUnmounted(() => {
   // Clean up cached object URLs
   for (const url of Object.values(animationCache.value)) {
     URL.revokeObjectURL(url);
+  }
+
+  // Clean up game data processor callback
+  if (gameDataProcessorUnwatch) {
+    gameDataProcessorUnwatch();
+    gameDataProcessorUnwatch = null;
   }
 });
 
@@ -138,41 +163,6 @@ function hideAnimation(): void {
     isFadingOut.value = false;
     isFadingIn.value = false;
   }, FADE_DURATION);
-}
-
-/**
- *
- * INFO:
- * 50 will get processed as "bull"
- */
-async function processGameData(gameData: IGameData): Promise<void> {
-  if (!gameData.match || gameData.match.activated !== undefined || !gameData.match.turns?.length) return;
-
-  if (gameData.match.variant === "Bull-off") return;
-
-  const currentThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
-  if (!currentThrow) return;
-
-  const editMode: boolean = gameData.match.activated !== undefined && gameData.match.activated >= 0;
-  if (editMode) abortAnimation();
-
-  const isLastThrow: boolean = gameData.match.turns[0].throws.length >= 3;
-  const throwName: string = currentThrow.segment.name; // S1
-  const winner: boolean = gameData.match.gameWinner >= 0;
-  const busted: boolean = gameData.match.turns[0].busted;
-  const points: number = gameData.match.turns[0].points;
-  const miss: boolean = throwName.toLocaleLowerCase().startsWith("m");
-  const combinedThrows: string = gameData.match.turns[0].throws.map(t => t.segment.name.toLowerCase()).join("_");
-
-  playAnimation(throwName.toLowerCase());
-  if (winner) playAnimation("gameshot");
-  if (busted) playAnimation("busted");
-  if (isLastThrow && !busted) {
-    playAnimation(points.toString());
-    await new Promise(resolve => setTimeout(resolve, 500));
-    playAnimation(combinedThrows);
-  }
-  if (miss) playAnimation("outside");
 }
 
 /**
@@ -235,7 +225,7 @@ async function getAnimationUrl(trigger: string): Promise<string | null> {
  */
 async function loadAnimationFromOPFS(animationId: string): Promise<string | null> {
   if (!isOPFSAvailable()) {
-    console.error("Autodarts Tools: OPFS not available, cannot load animation", animationId);
+    console.error("Autodarts Tools: Animations: OPFS not available, cannot load animation", animationId);
     return null;
   }
 
@@ -247,7 +237,7 @@ async function loadAnimationFromOPFS(animationId: string): Promise<string | null
       return objectURL;
     }
   } catch (error) {
-    console.error("Error loading animation from OPFS:", error);
+    console.error("Autodarts Tools: Animations: Error loading animation from OPFS:", error);
   }
 
   return null;
@@ -256,12 +246,11 @@ async function loadAnimationFromOPFS(animationId: string): Promise<string | null
 /**
  * Play animation for a trigger
  */
-async function playAnimation(trigger: string): Promise<void> {
-  console.log("Autodarts Tools: Playing animation", trigger);
-
+async function playAnimation(animationUrl: string): Promise<void> {
   try {
-    const animationUrl = await getAnimationUrl(trigger);
     if (!animationUrl) return;
+
+    console.log("Autodarts Tools: Animations: Playing animation", animationUrl);
 
     // Update the board position before showing animation
     updateBoardPosition();
@@ -297,7 +286,7 @@ async function playAnimation(trigger: string): Promise<void> {
       }, duration);
     }, delayStart);
   } catch (error) {
-    console.error("Autodarts Tools: Play animation error", error);
+    console.error("Autodarts Tools: Animations: Play error", error);
   }
 }
 
