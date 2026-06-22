@@ -55,6 +55,12 @@ function checkBoardStatus(boardData: IBoard): void {
     playSound("calibration_finished");
 }
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.caller.enabled && config.caller.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 export async function caller() {
   console.log("Autodarts Tools: caller");
 
@@ -68,7 +74,7 @@ export async function caller() {
 
     if (!gameDataWatcherUnwatch) {
       gameDataWatcherUnwatch = AutodartsToolsGameData.watch((gameData: IGameData, oldGameData: IGameData) => {
-        if (!config?.caller?.enabled) return;
+        if (!_is_enabled(config, gameData.gameMode)) return;
         console.log("Autodarts Tools: caller game data updated");
 
         // Debounce the processGameData call
@@ -85,14 +91,14 @@ export async function caller() {
       const url = window.location.href;
       const matchId = url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0];
 
-      if (gameData.match?.id === matchId) {
+      if (gameData.match?.id === matchId && _is_enabled(config, gameData.gameMode)) {
         processGameData(gameData, gameData);
       }
     }
 
     if (!boardDataWatcherUnwatch) {
       boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
-        if (!config?.caller?.enabled) return;
+        if (!_is_enabled(config, gameData.gameMode)) return;
         checkBoardStatus(boardData);
       });
     }

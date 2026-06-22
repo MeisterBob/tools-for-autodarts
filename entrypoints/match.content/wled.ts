@@ -32,6 +32,12 @@ function eventTrigger(trigger: string) {
     setEffectByTrigger(trigger);
 }
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.wledFx.enabled && config.wledFx.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 async function checkStatus(boardData: IBoard): Promise<void> {
   const boardEvent: string | undefined = boardData.event;
   const boardStatus: string | undefined = boardData.status;
@@ -77,7 +83,7 @@ export async function wledFx() {
     if (!gameDataWatcherUnwatch) {
       gameDataWatcherUnwatch = AutodartsToolsGameData.watch(
         (gameData: IGameData, oldGameData: IGameData) => {
-          if (!config.wledFx?.enabled) return;
+          if (!_is_enabled(config, gameData.gameMode)) return;
 
           // Debounce the processGameData call
           if (debounceTimer) {
@@ -104,7 +110,7 @@ export async function wledFx() {
     if (!lobbyDataWatcherUnwatch) {
       lobbyDataWatcherUnwatch = AutodartsToolsLobbyData.watch(
         async (_lobbyData: ILobbies | undefined, _oldLobbyData: ILobbies | undefined) => {
-          if (!_lobbyData || !_oldLobbyData || !config.wledFx?.enabled) return;
+          if (!_lobbyData || !_oldLobbyData || !_is_enabled(config, gameData.gameMode)) return;
           const currentURL = window.location.href;
           if (!currentURL.includes("lobbies")) return;
 
@@ -134,7 +140,7 @@ export async function wledFx() {
     if (!tournamentDataWatcherUnwatch) {
       tournamentDataWatcherUnwatch = AutodartsToolsTournamentData.watch(
         async (tournamentData: ITournament | undefined, oldTournamentData: ITournament | undefined) => {
-          if (!tournamentData || !config.wledFx?.enabled) return;
+          if (!tournamentData || !_is_enabled(config, gameData.gameMode)) return;
 
           // Check if tournament event is "start" and trigger the tournament_ready effect
           if (tournamentData.event === "start") {

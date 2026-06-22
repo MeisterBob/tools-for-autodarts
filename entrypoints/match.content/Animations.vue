@@ -78,13 +78,20 @@ const animationContainerStyle = computed(() => {
   };
 });
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.animations.enabled && config.animations.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 onMounted(async () => {
   console.log("Autodarts Tools: Animations mounted");
 
   try {
     config.value = await AutodartsToolsConfig.getValue();
     AutodartsToolsGameData.watch((gameData: IGameData) => {
-      processGameData(gameData);
+      if (_is_enabled(config.value as IConfig, gameData.gameMode))
+        processGameData(gameData);
     });
 
     // Update board position
@@ -263,8 +270,8 @@ async function playAnimation(trigger: string): Promise<void> {
   console.log("Autodarts Tools: Playing animation", trigger);
 
   try {
-    const animationUrl = await getAnimationUrl(trigger);
-    if (!animationUrl) return;
+    const animation = await getAnimationUrl(trigger);
+    if (!animation) return;
 
     // Update the board position before showing animation
     updateBoardPosition();
