@@ -26,19 +26,20 @@ const log = createLogger("GameDataProcessor", { debug: false })
  * - **Variant-specific**: Cricket misses, ATC targets, RTW fields, Shanghai, Bob's 27
  *
  * ### Priority System
- * Each trigger has a priority level (lower number = higher priority, plays first):
- * - 10: Matchshot variant (player-specific)
- * - 11: Matchshot
- * - 20: Gameshot variant
- * - 21: Gameshot
- * - 30: Busted
- * - 40: Combined throws (e.g., s1_d20_b)
- * - 50: Point total (e.g., 50)
- * - 55: Remaining points
- * - 60: Individual throw (e.g., s20, d10)
- * - 70: Player name / bot
- * - 80: Board events
- * - 90: Fallback/other
+ * Each trigger has a priority level (higher number = higher priority, plays first):
+ * - 100: Matchshot variant (player-specific)
+ * - 99:  Matchshot
+ * - 90:  Gameshot variant
+ * - 89:  Gameshot
+ * - 80:  Busted
+ * - 70:  Player name / bot
+ * - 60:  Combined throws (e.g., s1_d20_b)
+ * - 50:  Point total (e.g., 50)
+ * - 40:  Remaining points
+ * - 30:  Individual throw (e.g., s20, d10)
+ * - 25:  Throw
+ * - 20:  Board events
+ * - 10:  Fallback/other
  *
  * ## How to Use
  *
@@ -53,15 +54,15 @@ const log = createLogger("GameDataProcessor", { debug: false })
  *   // React to triggers here
  * };
  *
- * // Register with default priority (ascending - highest priority first)
+ * // Register with default priority (descending - highest priority first)
  * useGameDataProcessor("my-module", handleTriggers);
  *
  * // Or customize priority order and override specific trigger priorities
  * useGameDataProcessor("my-module", handleTriggers, {
- *   sortOrder: "desc",  // "asc" (default) or "desc"
+ *   sortOrder: "asc",  // "desc" (default) or "asc"
  *   priorityOverrides: {
- *     "matchshot": 5,  // Play matchshot before gameshot
- *     "s20": 35        // Play s20 before busted
+ *     "matchshot": 95,  // Play matchshot before gameshot
+ *     "s20": 75         // Play s20 before busted
  *   }
  * });
  * ```
@@ -115,7 +116,7 @@ const log = createLogger("GameDataProcessor", { debug: false })
 
 /**
  * Represents a trigger with priority information
- * Lower priority number = higher priority (more important to play)
+ * Higher priority number = higher priority (more important to play)
  */
 export interface IGameTrigger {
   trigger: string;
@@ -144,7 +145,7 @@ export type TriggerSortOrder = "asc" | "desc";
 
 /** Options for registering a callback with priority customization */
 export interface CallbackOptions {
-  /** Sort order: "asc" (lower priority first) or "desc" (higher priority first) */
+  /** Sort order: "desc" (higher priority first, default) or "asc" (lower priority first) */
   sortOrder?: TriggerSortOrder;
   /** Override priority values for specific triggers. Keys are trigger names or TRIGGER_PRIORITIES enum values */
   priorityOverrides?: Record<string | number, number>;
@@ -161,20 +162,21 @@ export enum TRIGGER_CATEGORIES {
   OTHER = "other"
 };
 
-/** Priority levels (lower = higher priority) */
+/** Priority levels (higher = higher priority) */
 export enum TRIGGER_PRIORITIES {
-  MATCHSHOT_VARIANT = 10,   // Player-specific matchshot (matchshot_playername)
-  MATCHSHOT = 11,           // Match won
-  GAMESHOT_VARIANT = 20,    // Player-specific gameshot (gameshot_playername)
-  GAMESHOT = 21,            // Game won
-  BUSTED = 30,              // Turn busted
-  PLAYER_NAME = 40,         // Player name or bot
-  COMBINED_THROWS = 50,     // Multiple throws combined (s1_d20_b)
-  POINT_TOTAL = 60,         // Total points of turn
-  POINT_REMAINING = 70,     // Remaining points
-  INDIVIDUAL_THROW = 80,    // Single throw (s1, d20, etc)
-  BOARD_EVENT = 90,         // Board events
-  OTHER = 100,              // Fallback triggers
+  OTHER = 10,               // Fallback triggers
+  BOARD_EVENT = 20,         // Board events
+  THROW = 25,               // throw
+  INDIVIDUAL_THROW = 30,    // Single throw (s1, d20, etc)
+  POINT_REMAINING = 40,     // Remaining points
+  POINT_TOTAL = 50,         // Total points of turn
+  COMBINED_THROWS = 60,     // Multiple throws combined (s1_d20_b)
+  PLAYER_NAME = 70,         // Player name or bot
+  BUSTED = 80,              // Turn busted
+  GAMESHOT = 89,            // Game won
+  GAMESHOT_VARIANT = 90,    // Player-specific gameshot (gameshot_playername)
+  MATCHSHOT = 99,           // Match won
+  MATCHSHOT_VARIANT = 100,  // Player-specific matchshot (matchshot_playername)
 }
 
 let gameDataWatcherUnwatch: (() => void) | null = null;
@@ -255,7 +257,7 @@ export function registerGameDataCallback(
   options: CallbackOptions = {},
 ): void {
   const finalOptions: Required<CallbackOptions> = {
-    sortOrder: options.sortOrder ?? "asc",
+    sortOrder: options.sortOrder ?? "desc",
     priorityOverrides: options.priorityOverrides ?? {},
   };
   log.info(

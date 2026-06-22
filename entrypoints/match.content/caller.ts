@@ -80,9 +80,9 @@ export async function caller() {
         if (!_is_enabled(config, gameData.gameMode)) return;
         await processGameDataFromTriggers(triggers, gameData);
       }, {
-        sortOrder: "asc",
+        sortOrder: "desc",
         priorityOverrides: {
-          [TRIGGER_PRIORITIES.INDIVIDUAL_THROW]: 45,
+          [TRIGGER_PRIORITIES.INDIVIDUAL_THROW]: 65,
         }
       });
       gameDataProcessorUnwatch = () => unregisterGameDataCallback("caller");
