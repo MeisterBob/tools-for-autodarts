@@ -99,6 +99,7 @@ Tools for Autodarts is a browser extension that enhances your gaming experience 
 - **Instant Replay**: Records webcam footage and automatically shows replays of winning throws
 - **Gotcha Helper**: Shows how many points the other players are ahead in Gotcha game variant
   - Displays dart throws needed to catch up
+- **Checkout Guide**: Displays suggested checkout darts in each player's score box
 
 ### 🔊 Audio Features
 - **Caller**: Voice announcements for scores, checkouts, and each dart thrown during gameplay

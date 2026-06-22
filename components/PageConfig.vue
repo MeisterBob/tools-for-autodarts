@@ -148,89 +148,19 @@
           </div>
         </div>
 
-        <!-- Feature cards grid for Lobbies tab -->
+        <!-- Feature cards grid -->
         <template v-if="mounted">
           <div
-            v-if="activeTab === 0 && !showDangerZone"
+            v-if="!showDangerZone"
             :key="reloadKey"
             class="grid grid-cols-1 gap-5 lg:grid-cols-2"
           >
-            <!-- First row of feature cards -->
-            <DiscordWebhooks @toggle="openSettingsModal('discord-webhooks')" @setting-change="updateConfig" class="feature-card" data-feature-index="1" />
-            <AutoStart @setting-change="updateConfig" class="feature-card" data-feature-index="2" />
 
-            <!-- Second row of feature cards -->
-            <RecentLocalPlayers @toggle="openSettingsModal('recent-local-players')" @setting-change="updateConfig" class="feature-card" data-feature-index="4" />
-            <ShufflePlayers @setting-change="updateConfig" class="feature-card" data-feature-index="5" />
-
-            <!-- Third row of feature cards -->
-            <TeamLobby @setting-change="updateConfig" class="feature-card" data-feature-index="6" />
-            <QrCode @setting-change="updateConfig" class="feature-card" data-feature-index="3" />
-          </div>
-
-          <!-- Feature cards grid for Matches tab -->
-          <div
-            v-if="activeTab === 1 && !showDangerZone"
-            :key="reloadKey"
-            class="grid grid-cols-1 gap-5 lg:grid-cols-2"
-          >
-            <!-- First row of feature cards -->
-            <Colors @toggle="openSettingsModal('colors')" @setting-change="updateConfig" class="feature-card" data-feature-index="8" />
-            <TakeoutNotification @setting-change="updateConfig" class="feature-card" data-feature-index="9" />
-
-            <!-- Second row of feature cards -->
-            <NextPlayerOnTakeoutStuck @toggle="openSettingsModal('next-player-on-takeout-stuck')" @setting-change="updateConfig" class="feature-card" data-feature-index="10" />
-            <AutomaticNextLeg @toggle="openSettingsModal('automatic-next-leg')" @setting-change="updateConfig" class="feature-card" data-feature-index="11" />
-
-            <!-- Third row of feature cards -->
-            <SmallerScores @setting-change="updateConfig" :config="config" class="feature-card" data-feature-index="12" />
-            <HideMenuInMatch @setting-change="updateConfig" class="feature-card" data-feature-index="13" />
-
-            <!-- Fourth row of feature cards -->
-            <StreamingMode @toggle="openSettingsModal('streaming-mode')" @setting-change="updateConfig" class="feature-card" data-feature-index="14" />
-            <LargerLegsSets @toggle="openSettingsModal('larger-legs-sets')" @setting-change="updateConfig" class="feature-card" data-feature-index="15" />
-
-            <!-- Fifth row of feature cards -->
-            <LargerPlayerNames @toggle="openSettingsModal('larger-player-names')" @setting-change="updateConfig" class="feature-card" data-feature-index="16" />
-            <LargerPlayerMatchData @toggle="openSettingsModal('larger-player-match-data')" @setting-change="updateConfig" class="feature-card" data-feature-index="17" />
-
-            <!-- Sixth row of feature cards -->
-            <WinnerAnimation @setting-change="updateConfig" class="feature-card" data-feature-index="18" />
-            <AutomaticFullscreen @setting-change="updateConfig" class="feature-card" data-feature-index="19" />
-
-            <!-- Seventh row of feature cards -->
-            <Zoom @toggle="openSettingsModal('zoom')" @setting-change="updateConfig" class="feature-card" data-feature-index="20" />
-            <QuickCorrection @toggle="openSettingsModal('quick-correction')" @setting-change="updateConfig" class="feature-card" data-feature-index="21" />
-
-            <!-- Eighth row of feature cards -->
-            <EnhancedScoringDisplay @setting-change="updateConfig" class="feature-card" data-feature-index="22" />
-            <InstantReplay @toggle="openSettingsModal('instant-replay')" @setting-change="updateConfig" class="feature-card" data-feature-index="23" />
-
-            <!-- Ninth row of feature cards -->
-            <Gotcha @setting-change="updateConfig" class="feature-card" data-feature-index="24" />
-          </div>
-
-          <!-- Feature cards grid for Boards tab -->
-          <div
-            v-if="activeTab === 2 && !showDangerZone"
-            :key="reloadKey"
-            class="grid grid-cols-1 gap-5 lg:grid-cols-2"
-          >
-            <!-- First row of feature cards -->
-            <ExternalBoards @setting-change="updateConfig" class="feature-card" data-feature-index="24" />
-            <div class="feature-card" data-feature-index="25">
-            <!-- Placeholder for future feature -->
-            </div>
-          </div>
-
-          <!-- Feature cards grid for Sounds & Animations tab -->
-          <div
-            v-if="activeTab === 3 && !showDangerZone"
-            :key="reloadKey"
-            class="grid grid-cols-1 gap-5 lg:grid-cols-2"
-          >
             <!-- Warning message for sound and animation features -->
-            <div class="col-span-full rounded-md border border-yellow-500/50 bg-yellow-500/10 p-4 text-xs">
+            <div
+              v-if="featureGroups[activeTab].id==='sounds-animations'"
+              class="col-span-full rounded-md border border-yellow-500/50 bg-yellow-500/10 p-4 text-xs"
+            >
               <div class="flex items-start">
                 <div>
                   <p class="font-medium text-yellow-400">
@@ -244,13 +174,16 @@
               </div>
             </div>
 
-            <!-- First row of feature cards -->
-            <Animations @toggle="openSettingsModal('animations')" @setting-change="updateConfig" :config="config" class="feature-card" data-feature-index="26" />
-            <Caller @toggle="openSettingsModal('caller')" @setting-change="updateConfig" class="feature-card" data-feature-index="27" />
-
-            <!-- Second row of feature cards -->
-            <SoundFx @toggle="openSettingsModal('sound-fx')" @setting-change="updateConfig" class="feature-card" data-feature-index="28" />
-            <Wled @toggle="openSettingsModal('wled-fx')" @setting-change="updateConfig" class="feature-card" data-feature-index="29" />
+            <!-- Feature Cards -->
+            <component
+              v-for="(feature, idx) in featureGroups[activeTab].features"
+              :is="feature.component"
+              :key="feature.id"
+              :data-feature-index="idx + 1"
+              @setting-change="updateConfig"
+              @toggle="handleToggle(feature)"
+              class="feature-card"
+            />
           </div>
         </template>
       </div>
@@ -289,6 +222,7 @@ import QuickCorrection from "./Settings/QuickCorrection.vue";
 import EnhancedScoringDisplay from "./Settings/EnhancedScoringDisplay.vue";
 import InstantReplay from "./Settings/InstantReplay.vue";
 import Gotcha from "./Settings/Gotcha.vue";
+import CheckoutGuide from "./Settings/CheckoutGuide.vue";
 
 import packageConfig from "../package.json";
 
@@ -331,17 +265,18 @@ const featureGroups = [
       { id: "automatic-next-leg", title: "Automatic Next Leg Settings", component: AutomaticNextLeg, hasSettings: true },
       { id: "smaller-scores", title: "Smaller Scores Settings", component: SmallerScores, hasSettings: false },
       { id: "hide-menu-in-match", title: "Hide Menu In Match Settings", component: HideMenuInMatch, hasSettings: false },
-      { id: "enhanced-scoring-display", title: "Enhanced Scoring Display Settings", component: EnhancedScoringDisplay, hasSettings: false },
       { id: "streaming-mode", title: "Streaming Mode Settings", component: StreamingMode, hasSettings: true },
       { id: "larger-legs-sets", title: "Larger Legs Sets Settings", component: LargerLegsSets, hasSettings: true },
       { id: "larger-player-names", title: "Larger Player Names Settings", component: LargerPlayerNames, hasSettings: true },
       { id: "larger-player-match-data", title: "Larger Player Match Data Settings", component: LargerPlayerMatchData, hasSettings: true },
       { id: "winner-animation", title: "Winner Animation Settings", component: WinnerAnimation, hasSettings: false },
-
       { id: "automatic-fullscreen", title: "Automatic Fullscreen Settings", component: AutomaticFullscreen, hasSettings: false },
       { id: "zoom", title: "Darts Zoom Settings", component: Zoom, hasSettings: true },
       { id: "quick-correction", title: "Quick Correction Settings", component: QuickCorrection, hasSettings: true },
+      { id: "enhanced-scoring-display", title: "Enhanced Scoring Display Settings", component: EnhancedScoringDisplay, hasSettings: false },
       { id: "instant-replay", title: "Instant Replay Settings", component: InstantReplay, hasSettings: true },
+      { id: "gotcha", title: "Gotcha Settings", component: Gotcha, hasSettings: false },
+      { id: "checkout-guide", title: "Checkout Guide Settings", component: CheckoutGuide, hasSettings: false },
     ],
     settingIds: [ "colors", "next-player-on-takeout-stuck", "automatic-next-leg", "streaming-mode", "larger-legs-sets", "larger-player-names", "larger-player-match-data", "automatic-fullscreen", "zoom", "quick-correction", "instant-replay" ],
   },
@@ -423,6 +358,12 @@ watch(config, async () => {
   await AutodartsToolsConfig.setValue(toRaw(config.value));
   debouncedReload();
 }, { deep: true });
+
+function handleToggle(feature) {
+  if (feature.hasSettings) {
+    openSettingsModal(feature.id);
+  }
+}
 
 // Function to get the title for a setting
 function getSettingTitle(settingId) {
