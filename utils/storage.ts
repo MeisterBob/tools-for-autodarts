@@ -341,7 +341,7 @@ export interface IWled {
   preset: string;
   json_api: string;
   enabled: boolean;
-  triggers: string|string[];
+  triggers: string[];
 }
 
 export type TBoardStatus = BoardStatus | undefined;

@@ -451,7 +451,7 @@ const newEffect = ref<IWled>({
   preset: "0",
   url: '',
   json_api: '',
-  triggers: '',
+  triggers: [],
 });
 const editingIndex = ref<number | null>(null);
 const urlError = ref("");
@@ -484,9 +484,9 @@ const { notification, showNotification, hideNotification } = useNotification();
 
 // Computed property for trigger text handling
 const wledTrigger = computed({
-  get: () => newEffect.value.triggers,
+  get: () => Array.isArray(newEffect.value.triggers) ? newEffect.value.triggers.join("\n") : newEffect.value.triggers,
   set: (val: string) => {
-    newEffect.value.triggers = val.toLowerCase();
+    newEffect.value.triggers = val.toLowerCase().split("\n").filter(line => line.trim().length > 0);
   },
 });
 
@@ -655,7 +655,7 @@ async function fetchPresets() {
   try {
     const presetUrl = (newEffect.value.url.startsWith('http') ? '' : 'http://')
       + newEffect.value.url
-      + (newEffect.value.url.endsWith('/') ? '' :'/')
+      + (newEffect.value.url.endsWith('/') ? '' : '/')
       + 'presets.json';
     log.info("loading presets from", presetUrl);
     availablePresetsOptions.value = [{ value: newEffect.value.preset, label: 'failed to fetch presets' }];
@@ -678,7 +678,7 @@ async function fetchPresets() {
 }
 
 function openAddEffectModal() {
-  newEffect.value = { name: "", type: WledType.PRESET, url: "", preset: "0", json_api: "", triggers: "", enabled: true };
+  newEffect.value = { name: "", type: WledType.PRESET, url: "", preset: "0", json_api: "", triggers: [], enabled: true };
   isEditMode.value = false;
   editingIndex.value = null;
   urlError.value = "";
@@ -686,7 +686,7 @@ function openAddEffectModal() {
 }
 
 function closeEffectModal() {
-  newEffect.value = { name: "", type: WledType.PRESET, url: "", preset: "0", json_api: "", triggers: "", enabled: true };
+  newEffect.value = { name: "", type: WledType.PRESET, url: "", preset: "0", json_api: "", triggers: [], enabled: true };
   showEffectModal.value = false;
   editingIndex.value = null;
   urlError.value = "";
@@ -702,7 +702,7 @@ function editEffect(index: number) {
     url: effect.url || "",
     preset: effect.preset || "0",
     json_api: effect.json_api || "",
-    triggers: Array.isArray(effect.triggers) ? effect.triggers.join("\n") : "",
+    triggers: effect.triggers,
     enabled: true
   };
 
@@ -719,7 +719,7 @@ async function saveEffect() {
   }
 
   // Check if we have triggers
-  if (typeof newEffect.value.triggers === 'string' && !newEffect.value.triggers.trim()) {
+  if (newEffect.value.triggers.length === 0) {
     showNotification("Please provide at least one trigger", "error");
     return;
   }
@@ -756,12 +756,7 @@ async function saveEffect() {
 
   // Convert trigger to array of triggers (split by newline and filter empty lines)
   const triggers =
-    typeof newEffect.value.triggers === 'string'
-      ? newEffect.value.triggers
-        .split("\n")
-        .map((line) => line.trim().toLowerCase())
-        .filter((line) => line.length > 0)
-      : [];
+    newEffect.value.triggers.map((line) => line.trim().toLowerCase()).filter((line) => line.length > 0);
 
   // Create effect object
   const effect: IWled = {

@@ -310,12 +310,12 @@ export async function setEffect(effect: IWled, wait: boolean = false) {
   log.info("fetching", effect.url);
 
   const controller = new AbortController();
-  const data = {
+  const data: RequestInit = {
     mode: "no-cors",
     method: effect.type === WledType.URL ? "GET" : "POST",
     signal: controller.signal,
-    cache: "no-cache",
-    credentials: "omit",
+    cache: "no-cache" as RequestCache,
+    credentials: "omit" as RequestCredentials,
     ...(effect.type === WledType.API && {
       headers: { 'Content-Type': 'application/json' },
       body: effect.json_api
