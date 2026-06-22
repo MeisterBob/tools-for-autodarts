@@ -510,6 +510,12 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         });
       }
 
+      triggers.push({
+        trigger: `throw${gameData.match.turns[0].throws.length}`,
+        priority: TRIGGER_PRIORITIES.THROW,
+        category: TRIGGER_CATEGORIES.THROW,
+      });
+
       if (isLastThrow && !busted) {
         // Combined throws (most specific, e.g., "s1_s20_s5")
         triggers.push({
