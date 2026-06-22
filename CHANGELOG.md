@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Added Checkout Guide feature that displays suggested checkout darts in each player's score box
+  - Contributed by @MeisterBob
+
 ### Fixed
 - Fixed authentication token capture for the Autodarts OAuth 2.0 migration (Keycloak shutdown on 2026-06-28)
   - The page no longer hits the Keycloak token endpoint; `auth-cookie.ts` now watches the new auth server endpoints (`https://api.autodarts.io/auth/v1/exchange` and `/auth/v1/refresh`, plus `/auth/v1/token` and `/auth/v1/device/token`) and keeps the legacy Keycloak endpoint for the transition window
