@@ -56,6 +56,12 @@ function checkBoardStatus(boardData: IBoard): void {
     playSound("calibration_finished");
 }
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.caller.enabled && config.caller.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 export async function caller() {
   console.log("Autodarts Tools: caller");
 
@@ -69,7 +75,7 @@ export async function caller() {
     // Register with centralized game data processor (only once)
     if (!gameDataProcessorUnwatch) {
       registerGameDataCallback("caller", async (triggers: IGameTrigger[], gameData: IGameData) => {
-        if (!config?.caller?.enabled) return;
+        if (!_is_enabled(config, gameData.gameMode)) return;
         await processGameDataFromTriggers(triggers, gameData);
       }, {
         sortOrder: "asc",

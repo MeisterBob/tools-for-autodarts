@@ -79,6 +79,17 @@
               </div>
             </div>
 
+            <div>
+              <div class="mt-2 flex items-center gap-2">
+                <div class="flex items-center gap-2">
+                  <span>enable in selected Game Modes</span>
+                </div>
+                <AppMultiSelect id="gamemode-select" class="w-full"
+                  :options="Object.values(GameMode).map(mode => ({ value: mode, label: `${mode}` }))"
+                  v-model="config.animations.enabledGameModes" />
+              </div>
+            </div>
+
             <div class="mt-2 flex items-center gap-2 text-sm">
               <span class="icon-[pixelarticons--drag-and-drop] text-white/60" />
               <p>Drag and drop animations to change their order</p>
@@ -421,6 +432,7 @@ import AppNotification from "../AppNotification.vue";
 import AppSelect from "../AppSelect.vue";
 import AppTextarea from "../AppTextarea.vue";
 import AppToggle from "../AppToggle.vue";
+import AppMultiSelect from "../AppMultiSelect.vue";
 
 import { useNotification } from "@/composables/useNotification";
 import { deleteAnimationFromOPFS, getAnimationFromOPFS, getAnimationNameFromOPFS, isOPFSAvailable, saveAnimationToOPFS, validateAnimationTriggers } from "@/utils/helpers";

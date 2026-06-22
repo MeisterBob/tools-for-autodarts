@@ -57,6 +57,17 @@
               </div>
             </div>
 
+            <div>
+              <div class="mt-2 flex items-center gap-2">
+                <div class="flex items-center gap-2">
+                  <span>enable in selected Game Modes</span>
+                </div>
+                <AppMultiSelect id="gamemode-select" class="w-full"
+                  :options="Object.values(GameMode).map(mode => ({ value: mode, label: `${mode}` }))"
+                  v-model="config.caller.enabledGameModes" />
+              </div>
+            </div>
+
             <div class="mt-2 flex items-center gap-2 text-sm">
               <span class="icon-[pixelarticons--drag-and-drop] text-white/60" />
               <p>Drag and drop sounds to change their order</p>
@@ -656,6 +667,7 @@ import AppNotification from "../AppNotification.vue";
 import AppSelect from "../AppSelect.vue";
 import AppToggle from "../AppToggle.vue";
 import AppSlider from "../AppSlider.vue";
+import AppMultiSelect from "../AppMultiSelect.vue";
 import { AutodartsToolsConfig, type IConfig, type ISound } from "@/utils/storage";
 import { useNotification } from "@/composables/useNotification";
 import { useTTS } from "@/composables/useTTS";

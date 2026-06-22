@@ -33,6 +33,12 @@ function eventTrigger(trigger: string) {
     setEffectByTrigger(trigger);
 }
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.wledFx.enabled && config.wledFx.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 async function checkStatus(boardData: IBoard): Promise<void> {
   const boardEvent: string | undefined = boardData.event;
   const boardStatus: string | undefined = boardData.status;
@@ -77,8 +83,7 @@ export async function wledFx() {
     // Register with centralized game data processor (only once)
     if (!gameDataProcessorUnwatch) {
       registerGameDataCallback("wled", async (triggers: IGameTrigger[], gameData: IGameData) => {
-        console.log("Autodarts Tools: WLED: Processing triggers", triggers.length, "triggers");
-        if (!config.wledFx?.enabled) return;
+        if (!_is_enabled(config, gameData.gameMode)) return;
         await processGameDataFromTriggers(triggers, gameData);
       });
       gameDataProcessorUnwatch = () => unregisterGameDataCallback("wled");

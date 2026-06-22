@@ -74,6 +74,12 @@ const animationContainerStyle = computed(() => {
   };
 });
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.animations.enabled && config.animations.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 onMounted(async () => {
   console.log("Autodarts Tools: Animations: mounted");
 
@@ -93,7 +99,7 @@ onMounted(async () => {
     // Register with centralized game data processor
     if (!gameDataProcessorUnwatch) {
       registerGameDataCallback("animations", async (triggers: IGameTrigger[], gameData: IGameData) => {
-        if (!triggers.length || !gameData.match) return;
+        if (config.value && !_is_enabled(config.value, gameData.gameMode)) return;
 
         // let triggers_list: string = "";
         // triggers.forEach((trigger) => {

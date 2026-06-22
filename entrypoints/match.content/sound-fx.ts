@@ -66,6 +66,12 @@ function checkBoardStatus(boardData: IBoard): void {
     playSound("ambient_calibration_finished", 2);
 }
 
+function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
+  if (config.soundFx.enabled && config.soundFx.enabledGameModes.includes(gameMode))
+    return true;
+  return false;
+}
+
 export async function soundFx() {
   console.log("Autodarts Tools: Sound FX");
 
@@ -79,7 +85,7 @@ export async function soundFx() {
     // Register with centralized game data processor (only once)
     if (!gameDataProcessorUnwatch) {
       registerGameDataCallback("sound-fx", async (triggers: IGameTrigger[], gameData: IGameData) => {
-        if (!config?.soundFx?.enabled) return;
+        if (!_is_enabled(config, gameData.gameMode)) return;
         await processGameDataFromTriggers(triggers, gameData);
       });
       gameDataProcessorUnwatch = () => unregisterGameDataCallback("sound-fx");

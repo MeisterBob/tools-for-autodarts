@@ -107,6 +107,7 @@ export interface IConfig {
 
   animations: {
     enabled: boolean;
+    enabledGameModes: GameMode[];
     duration?: number;
     delayStart?: number;
     objectFit?: "cover" | "contain";
@@ -115,12 +116,14 @@ export interface IConfig {
   };
   caller: {
     enabled: boolean;
+    enabledGameModes: GameMode[];
     callEveryDart: boolean;
     callCheckout: boolean;
     sounds: ISound[];
   };
   soundFx: {
     enabled: boolean;
+    enabledGameModes: GameMode[];
     sounds: ISound[];
   };
   zoom: {
@@ -151,6 +154,7 @@ export interface IConfig {
   };
   wledFx: {
     enabled: boolean;
+    enabledGameModes: GameMode[];
     onlyOnce: boolean;
     boardIds: string[];
     effects: IWled[];
@@ -406,6 +410,7 @@ export const defaultConfig: IConfig = {
   },
   caller: {
     enabled: false,
+    enabledGameModes: Object.values(GameMode),
     callEveryDart: false,
     callCheckout: false,
     sounds: [],
@@ -478,6 +483,7 @@ export const defaultConfig: IConfig = {
   },
   animations: {
     enabled: false,
+    enabledGameModes: Object.values(GameMode),
     duration: 5,
     delayStart: 1,
     objectFit: "cover",
@@ -587,6 +593,7 @@ export const defaultConfig: IConfig = {
   },
   soundFx: {
     enabled: false,
+    enabledGameModes: Object.values(GameMode),
     sounds: [
       {
         name: "busted",
@@ -683,6 +690,7 @@ export const defaultConfig: IConfig = {
   },
   wledFx: {
     enabled: false,
+    enabledGameModes: Object.values(GameMode),
     onlyOnce: true,
     boardIds: [],
     effects: [
