@@ -17,11 +17,12 @@ import { twMerge } from "tailwind-merge";
 
 import type { IGameData } from "@/utils/game-data-storage";
 
-import { getAnimationFromOPFS, isOPFSAvailable, triggerPatterns } from "@/utils/helpers";
+import { getAnimationFromOPFS, isOPFSAvailable } from "@/utils/helpers";
 import { AutodartsToolsConfig, type IAnimation } from "@/utils/storage";
 import {
   registerGameDataCallback,
   unregisterGameDataCallback,
+  findMatchingItem,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import { createLogger } from "@/utils/logger";
@@ -103,21 +104,18 @@ onMounted(async () => {
       registerGameDataCallback("animations", async (triggers: IGameTrigger[], gameData: IGameData) => {
         if (config.value && !_is_enabled(config.value, gameData.gameMode)) return;
 
-        // let triggers_list: string = "";
-        // triggers.forEach((trigger) => {
-        //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
-        // });
-        // log.info("processing triggers", triggers_list)
+        let triggers_list: string = "";
+        triggers.forEach((trigger) => {
+          triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+        });
+        log.debug("processing triggers", triggers_list)
 
         // For animations, we only want to play the highest priority trigger
         // since we can only show one animation at a time
-        while (triggers.length) {
-          const trigger: IGameTrigger = triggers.shift() as IGameTrigger;
-          const animation = await getAnimationUrl(trigger.trigger);
-          if (!animation)
-            continue;
-          await playAnimation(animation);
-          break;
+        const matched = findMatchingItem(config.value?.animations?.data ?? [], triggers);
+        if (matched) {
+          const animation = await resolveAnimationUrl(matched[0].item);
+          if (animation) await playAnimation(animation);
         }
       });
       gameDataProcessorUnwatch = () => unregisterGameDataCallback("animations");
@@ -174,61 +172,20 @@ function hideAnimation(): void {
 }
 
 /**
- * Get animation URL for a trigger, selecting randomly from matching animations
+ * Resolve the playable URL for an already-matched animation (handles OPFS and cache)
  */
-async function getAnimationUrl(trigger: string): Promise<IAnimation | null> {
-  if (!config.value?.animations?.data || config.value.animations.data.length === 0) {
-    return null;
-  }
-
-  const satisfiesTrigger = (animation: IAnimation, trigger: string) => {
-    if (!Array.isArray(animation.triggers)) return false;
-
-    // validate range triggers of animation
-    const triggerNum = Number(trigger);
-    if (!Number.isNaN(triggerNum)) {
-      const rangeTriggers = animation.triggers.map((t: string) => {
-        const match = t.match(triggerPatterns.ranges);
-        if (!match) return null;
-        return { min: Number(match[1]), max: Number(match[2]) };
-      }).filter(x => x !== null);
-
-      const hasMatchingRange = rangeTriggers.some(({ min, max }: { min: number; max: number }) => {
-        return triggerNum >= min && triggerNum <= max;
-      });
-
-      if (hasMatchingRange) return true;
-    }
-
-    return animation.triggers.includes(trigger);
-  };
-
-  // Find animations that match this trigger
-  const matchedAnimations = config.value.animations.data.filter(
-    (animation: IAnimation) => animation.enabled && satisfiesTrigger(animation, trigger),
-  );
-
-  if (matchedAnimations.length === 0) {
-    return null;
-  }
-
-  // Select a random animation from the matched ones
-  const randomIndex = Math.floor(Math.random() * matchedAnimations.length);
-  const selectedAnimation = matchedAnimations[randomIndex];
-
-  // Handle locally uploaded animations from OPFS
-  if (selectedAnimation.animationId && !selectedAnimation.url) {
-    // Check if we already have it in cache
-    const fromCache = animationCache.value[selectedAnimation.animationId];
-    if (fromCache) return fromCache;
+async function resolveAnimationUrl(animation: IAnimation): Promise<IAnimation | null> {
+  if (animation.animationId && !animation.url) {
+    const fromCache = animationCache.value[animation.animationId];
+    if (fromCache) return { url: fromCache, duration: animation.duration } as IAnimation;
 
     return {
-      url: await loadAnimationFromOPFS(selectedAnimation.animationId),
-      duration: selectedAnimation.duration
+      url: await loadAnimationFromOPFS(animation.animationId),
+      duration: animation.duration,
     } as IAnimation;
   }
 
-  return selectedAnimation;
+  return animation;
 }
 
 /**

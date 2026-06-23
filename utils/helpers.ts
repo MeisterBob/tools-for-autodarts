@@ -4,6 +4,9 @@ import type { IConfig, ISound } from "@/utils/storage";
 
 import { GameMode } from "@/utils/game-data-storage";
 
+import { createLogger } from "@/utils/logger";
+const log = createLogger("helpers")
+
 export const isX01 = () => document.getElementById("ad-ext-game-variant")?.textContent === GameMode.X01;
 export const isBullOff = () => document.getElementById("ad-ext-game-variant")?.textContent === "Bull-off";
 export const isCricket = () => document.getElementById("ad-ext-game-variant")?.textContent?.split(" ")[0] === "Cricket";
@@ -24,7 +27,7 @@ soundEffect3.preload = "auto";
 soundEffect1.addEventListener("canplaythrough", () => {
   // Removed automatic play to prevent double sounds
   if (soundEffect1.paused && soundEffect1.autoplay) {
-    console.log("Sound 1 loaded and ready to play");
+    log.info("Sound 1 loaded and ready to play");
     // Removed automatic play call
   }
 });
@@ -32,7 +35,7 @@ soundEffect1.addEventListener("canplaythrough", () => {
 soundEffect2.addEventListener("canplaythrough", () => {
   // Removed automatic play to prevent double sounds
   if (soundEffect2.paused && soundEffect2.autoplay) {
-    console.log("Sound 2 loaded and ready to play");
+    log.info("Sound 2 loaded and ready to play");
     // Removed automatic play call
   }
 });
@@ -40,23 +43,23 @@ soundEffect2.addEventListener("canplaythrough", () => {
 soundEffect3.addEventListener("canplaythrough", () => {
   // Removed automatic play to prevent double sounds
   if (soundEffect3.paused && soundEffect3.autoplay) {
-    console.log("Sound 3 loaded and ready to play");
+    log.info("Sound 3 loaded and ready to play");
     // Removed automatic play call
   }
 });
 
-export const soundEffectArray = [ soundEffect1, soundEffect2, soundEffect3 ];
+export const soundEffectArray = [soundEffect1, soundEffect2, soundEffect3];
 
 export function isiOS() {
   return [
-    "iPad Simulator", "iPhone Simulator", "iPod Simulator", "iPad", "iPhone", "iPod" ].includes(navigator.platform) // iPad on iOS 13 detection
+    "iPad Simulator", "iPhone Simulator", "iPod Simulator", "iPad", "iPhone", "iPod"].includes(navigator.platform) // iPad on iOS 13 detection
     || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 }
 
 // Add Safari detection function
 export function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-         || (navigator.userAgent.includes("AppleWebKit") && !navigator.userAgent.includes("Chrome"));
+    || (navigator.userAgent.includes("AppleWebKit") && !navigator.userAgent.includes("Chrome"));
 }
 
 // Function to get the authorization token from storage
@@ -85,7 +88,7 @@ export async function getUserIdFromToken(): Promise<string | null> {
     // Extract and return the 'sub' claim which contains the user ID
     return payload.sub || null;
   } catch (error) {
-    console.error("Error decoding JWT token:", error);
+    log.error("Error decoding JWT token:", error);
     return null;
   }
 }
@@ -144,8 +147,8 @@ let dbPromise: Promise<IDBPDatabase<SoundDB>> | null = null;
 // Check if IndexedDB is available in the browser
 export function isIndexedDBAvailable(): boolean {
   return typeof window !== "undefined"
-         && typeof window.indexedDB !== "undefined"
-         && window.indexedDB !== null;
+    && typeof window.indexedDB !== "undefined"
+    && window.indexedDB !== null;
 }
 
 // Convert base64 to blob for better browser compatibility (especially Safari)
@@ -173,12 +176,12 @@ export function base64toBlob(base64Data: string): Blob {
 
         // For M4A files specifically, which commonly cause issues in Safari
         if (base64Content.includes("ftypM4A") || base64Content.includes("M4A")
-            || contentType.includes("mp4") || contentType.includes("m4a")) {
+          || contentType.includes("mp4") || contentType.includes("m4a")) {
           // Force the content type to audio/mp4 for M4A files
           base64Data = `data:audio/mp4;base64,${base64Content}`;
         }
       } catch (parseError) {
-        console.warn("Error parsing base64 data:", parseError);
+        log.warn("Error parsing base64 data:", parseError);
         // Fall back to original base64Data if parsing fails
       }
     }
@@ -201,17 +204,17 @@ export function base64toBlob(base64Data: string): Blob {
       uInt8Array[i] = raw.charCodeAt(i);
     }
 
-    return new Blob([ uInt8Array ], { type: finalContentType });
+    return new Blob([uInt8Array], { type: finalContentType });
   } catch (error) {
-    console.error("Error converting base64 to blob:", error);
-    return new Blob([ "" ], { type: "audio/mpeg" });
+    log.error("Error converting base64 to blob:", error);
+    return new Blob([""], { type: "audio/mpeg" });
   }
 }
 
 // Initialize the IndexedDB database
 export function getDB(): Promise<IDBPDatabase<SoundDB>> | null {
   if (!isIndexedDBAvailable()) {
-    console.warn("IndexedDB is not available in this browser");
+    log.warn("IndexedDB is not available in this browser");
     return null;
   }
 
@@ -271,7 +274,7 @@ async function saveToIndexedDB(
     await db.put(storeName, soundData);
     return id;
   } catch (error) {
-    console.error(`Error saving sound to IndexedDB (${storeName}):`, error);
+    log.error(`Error saving sound to IndexedDB (${storeName}):`, error);
     return null;
   }
 }
@@ -334,7 +337,7 @@ async function getFromIndexedDB(
 
     return base64;
   } catch (error) {
-    console.error(`Error getting sound from IndexedDB (${storeName}):`, error);
+    log.error(`Error getting sound from IndexedDB (${storeName}):`, error);
     return null;
   }
 }
@@ -361,7 +364,7 @@ async function deleteFromIndexedDB(
     await db.delete(storeName, id);
     return true;
   } catch (error) {
-    console.error(`Error deleting sound from IndexedDB (${storeName}):`, error);
+    log.error(`Error deleting sound from IndexedDB (${storeName}):`, error);
     return false;
   }
 }
@@ -387,7 +390,7 @@ async function clearFromIndexedDB(
     await db.clear(storeName);
     return true;
   } catch (error) {
-    console.error(`Error clearing sounds from IndexedDB (${storeName}):`, error);
+    log.error(`Error clearing sounds from IndexedDB (${storeName}):`, error);
     return false;
   }
 }
@@ -417,7 +420,7 @@ async function getAllSoundsFromIndexedDB(
       base64: sound.base64,
     }));
   } catch (error) {
-    console.error(`Error getting all sounds from IndexedDB (${storeName}):`, error);
+    log.error(`Error getting all sounds from IndexedDB (${storeName}):`, error);
     return null;
   }
 }
@@ -490,7 +493,7 @@ async function migrateSoundsToIndexedDB(
         updatedSounds.push(sound);
       }
     } catch (error) {
-      console.error(`Error migrating ${featureKey} sound to IndexedDB:`, error);
+      log.error(`Error migrating ${featureKey} sound to IndexedDB:`, error);
       // Keep the original if there was an error
       updatedSounds.push(sound);
     }
@@ -532,7 +535,7 @@ export async function backgroundFetch(url: string, options: RequestInit = {}): P
 
     // Check if response is undefined (communication issue)
     if (response === undefined) {
-      console.error("Background fetch failed: No response from background script");
+      log.error("Background fetch failed: No response from background script");
       return {
         ok: false,
         error: "No response from background script. This may be due to a messaging issue.",
@@ -541,16 +544,16 @@ export async function backgroundFetch(url: string, options: RequestInit = {}): P
 
     // If response suggests using chunked download for large files
     if (response.ok && response.tooLarge && response.suggestChunked) {
-      console.log("File too large for regular backgroundFetch, using chunkedBackgroundFetch instead");
+      log.info("File too large for regular backgroundFetch, using chunkedBackgroundFetch instead");
       return await chunkedBackgroundFetch(url, options);
     }
 
     return response;
   } catch (error) {
-    console.error("Error in backgroundFetch:", error);
+    log.error("Error in backgroundFetch:", error);
     // If we get a "message too large" error, try chunked download
     if (error instanceof Error && error.message.includes("Message length exceeded")) {
-      console.log("Message size exceeded, falling back to chunkedBackgroundFetch");
+      log.info("Message size exceeded, falling back to chunkedBackgroundFetch");
       return await chunkedBackgroundFetch(url, options);
     }
 
@@ -581,7 +584,7 @@ export async function chunkedBackgroundFetch(url: string, options: RequestInit =
 
     // Check if startResponse is undefined (communication issue)
     if (startResponse === undefined) {
-      console.error("Chunked background fetch failed: No response from background script");
+      log.error("Chunked background fetch failed: No response from background script");
       return {
         ok: false,
         error: "No response from background script. This may be due to a messaging issue.",
@@ -639,7 +642,7 @@ export async function chunkedBackgroundFetch(url: string, options: RequestInit =
       data: dataUrl,
     };
   } catch (error) {
-    console.error("Error in chunkedBackgroundFetch:", error);
+    log.error("Error in chunkedBackgroundFetch:", error);
     return {
       ok: false,
       error: error instanceof Error ? error.message : String(error),
@@ -661,36 +664,36 @@ export function detectAudioMimeType(base64Data: string): string {
   try {
     // MP3 detection - look for ID3 or MPEG header patterns
     if (base64Content.startsWith("SUQz")
-        || base64Content.startsWith("ID3")
-        || base64Content.includes("LAME")
-        || base64Content.startsWith("//M")
-        || base64Content.startsWith("//Ug")
-        || base64Content.startsWith("AAAA")) {
+      || base64Content.startsWith("ID3")
+      || base64Content.includes("LAME")
+      || base64Content.startsWith("//M")
+      || base64Content.startsWith("//Ug")
+      || base64Content.startsWith("AAAA")) {
       return "audio/mpeg";
     }
 
     // M4A/AAC detection
     if (base64Content.includes("ftypM4A")
-        || base64Content.includes("M4A")
-        || base64Content.includes("mp42")
-        || base64Content.includes("MOOV")
-        || base64Content.includes("ftyp")) {
+      || base64Content.includes("M4A")
+      || base64Content.includes("mp42")
+      || base64Content.includes("MOOV")
+      || base64Content.includes("ftyp")) {
       return "audio/mp4";
     }
 
     // WAV detection
     if (base64Content.startsWith("RIFF")
-        || base64Content.startsWith("UklG") // RIFF in base64
-        || base64Content.includes("WAVE")
-        || base64Content.includes("wave")) {
+      || base64Content.startsWith("UklG") // RIFF in base64
+      || base64Content.includes("WAVE")
+      || base64Content.includes("wave")) {
       return "audio/wav";
     }
 
     // OGG detection
     if (base64Content.startsWith("T0RnZ")
-        || base64Content.startsWith("Og==") // "O" in base64
-        || base64Content.includes("vorbis")
-        || base64Content.includes("vorb")) {
+      || base64Content.startsWith("Og==") // "O" in base64
+      || base64Content.includes("vorbis")
+      || base64Content.includes("vorb")) {
       return "audio/ogg";
     }
 
@@ -703,7 +706,7 @@ export function detectAudioMimeType(base64Data: string): string {
       return "audio/webm";
     }
   } catch (error) {
-    console.warn("Error in MIME type detection:", error);
+    log.warn("Error in MIME type detection:", error);
   }
 
   // Default to MP3 if we can't detect the format
@@ -794,7 +797,7 @@ export async function isCustomGravatar(avatarUrl: string): Promise<boolean> {
     const response = await fetch(url.toString());
     return response.status === 200;
   } catch (error) {
-    console.error("Error checking Gravatar:", error);
+    log.error("Error checking Gravatar:", error);
     return false;
   }
 }
@@ -867,7 +870,7 @@ export async function saveAnimationToIndexedDB(
     await db.put("animations", animationData);
     return id;
   } catch (error) {
-    console.error("Error saving animation to IndexedDB:", error);
+    log.error("Error saving animation to IndexedDB:", error);
     return null;
   }
 }
@@ -883,7 +886,7 @@ export async function getAnimationDataFromIndexedDB(id: string) {
 
     return animation;
   } catch (error) {
-    console.error("Error getting animation data from IndexedDB:", error);
+    log.error("Error getting animation data from IndexedDB:", error);
     return null;
   }
 }
@@ -895,7 +898,7 @@ export async function getAnimationFromIndexedDB(id: string): Promise<string | nu
 
     return data.base64;
   } catch (error) {
-    console.error("Error getting animation from IndexedDB:", error);
+    log.error("Error getting animation from IndexedDB:", error);
     return null;
   }
 }
@@ -907,7 +910,7 @@ export async function getAnimationNameFromIndexedDB(id: string): Promise<string 
 
     return data.name;
   } catch (error) {
-    console.error("Error getting animation name from IndexedDB:", error);
+    log.error("Error getting animation name from IndexedDB:", error);
     return null;
   }
 }
@@ -921,7 +924,7 @@ export async function deleteAnimationFromIndexedDB(id: string): Promise<boolean>
     await db.delete("animations", id);
     return true;
   } catch (error) {
-    console.error("Error deleting animation from IndexedDB:", error);
+    log.error("Error deleting animation from IndexedDB:", error);
     return false;
   }
 }
@@ -935,7 +938,7 @@ export async function clearAnimationsFromIndexedDB(): Promise<boolean> {
     await db.clear("animations");
     return true;
   } catch (error) {
-    console.error("Error clearing animations from IndexedDB:", error);
+    log.error("Error clearing animations from IndexedDB:", error);
     return false;
   }
 }
@@ -953,7 +956,7 @@ export async function getAllAnimationsFromIndexedDB(): Promise<Array<{ id: strin
       base64: animation.base64,
     }));
   } catch (error) {
-    console.error("Error getting all animations from IndexedDB:", error);
+    log.error("Error getting all animations from IndexedDB:", error);
     return null;
   }
 }
@@ -978,7 +981,7 @@ export const triggerPatterns = {
   triples: /^t(1[0-9]|20|[1-9])$/,
 
   // Special events
-  specialEvents: /^(bull|outside|busted|gameshot)$/,
+  specialEvents: /^(bull|outside|busted|gameshot|matchshot|throw[1-3])$/,
 
   // Combination tags: Format: [first dart]_[second dart]_[third dart]
   // Each dart can be a single, double, triple, or bull
@@ -997,53 +1000,45 @@ export function validateAnimationTriggers(triggers: string[]): {
   const validTriggers: string[] = [];
   const invalidTriggers: string[] = [];
 
-  console.log("checking triggers", triggers);
+  log.info("checking triggers", triggers);
 
   if (!Array.isArray(triggers)) {
     return { validTriggers: [], invalidTriggers: [] };
   }
 
-  // Combination pattern builder
   const isValidCombination = (combo: string): boolean => {
     const parts = combo.split("_");
-
-    // Must have 2 or 3 parts
-    if (parts.length < 2 || parts.length > 3) {
-      return false;
-    }
-
-    // Each part must be a valid dart
+    if (parts.length < 2 || parts.length > 3) return false;
     return parts.every(part => triggerPatterns.dartPattern.test(part));
   };
+
+  const isValidSingleTrigger = (t: string): boolean => {
+    return triggerPatterns.points.test(t)
+      || triggerPatterns.singles.test(t)
+      || triggerPatterns.doubles.test(t)
+      || triggerPatterns.triples.test(t)
+      || triggerPatterns.specialEvents.test(t)
+      || triggerPatterns.ranges.test(t)
+      || isValidCombination(t);
+  }
 
   // Process each trigger
   for (const trigger of triggers) {
     const trimmedTrigger = trigger.trim().toLowerCase();
 
-    // Skip empty triggers
-    if (!trimmedTrigger) {
-      continue;
-    }
+    if (!trimmedTrigger) continue;
 
-    // Check if it's a valid combination
-    if (trimmedTrigger.includes("_")) {
-      if (isValidCombination(trimmedTrigger)) {
+    // Check if it's a '+'-combined trigger (each part must be individually valid)
+    if (trimmedTrigger.includes("+")) {
+      const parts = trimmedTrigger.split("+");
+      if (parts.length >= 2 && parts.every(p => p && isValidSingleTrigger(p)))
         validTriggers.push(trimmedTrigger);
-      } else {
+      else
         invalidTriggers.push(trimmedTrigger);
-      }
       continue;
     }
 
-    // Check against all single-dart patterns
-    if (
-      triggerPatterns.points.test(trimmedTrigger)
-      || triggerPatterns.singles.test(trimmedTrigger)
-      || triggerPatterns.doubles.test(trimmedTrigger)
-      || triggerPatterns.triples.test(trimmedTrigger)
-      || triggerPatterns.specialEvents.test(trimmedTrigger)
-      || triggerPatterns.ranges.test(trimmedTrigger)
-    ) {
+    if (isValidSingleTrigger(trimmedTrigger)) {
       validTriggers.push(trimmedTrigger);
     } else {
       invalidTriggers.push(trimmedTrigger);
@@ -1057,8 +1052,8 @@ export function validateAnimationTriggers(triggers: string[]): {
 // Check if OPFS is available in this browser
 export function isOPFSAvailable(): boolean {
   return typeof navigator !== "undefined"
-      && typeof navigator.storage !== "undefined"
-      && typeof navigator.storage.getDirectory === "function";
+    && typeof navigator.storage !== "undefined"
+    && typeof navigator.storage.getDirectory === "function";
 }
 
 // Get the animations directory in OPFS
@@ -1099,7 +1094,7 @@ export async function saveAnimationToOPFS(fileName: string, fileBlob: Blob): Pro
 
     return animationId;
   } catch (error) {
-    console.error("Error saving animation to OPFS:", error);
+    log.error("Error saving animation to OPFS:", error);
     throw error;
   }
 }
@@ -1122,7 +1117,7 @@ export async function getAnimationFromOPFS(animationId: string): Promise<string 
     // Create and return an object URL for the file
     return URL.createObjectURL(file);
   } catch (error) {
-    console.error("Error retrieving animation from OPFS:", error);
+    log.error("Error retrieving animation from OPFS:", error);
     return null;
   }
 }
@@ -1136,7 +1131,7 @@ export async function getAnimationNameFromOPFS(animationId: string): Promise<str
     const metadata = JSON.parse(metadataStr);
     return metadata.fileName || null;
   } catch (error) {
-    console.error("Error getting animation name:", error);
+    log.error("Error getting animation name:", error);
     return null;
   }
 }
@@ -1159,7 +1154,7 @@ export async function deleteAnimationFromOPFS(animationId: string): Promise<bool
 
     return true;
   } catch (error) {
-    console.error("Error deleting animation from OPFS:", error);
+    log.error("Error deleting animation from OPFS:", error);
     return false;
   }
 }
@@ -1178,11 +1173,11 @@ export async function clearAnimationsFromOPFS(): Promise<boolean> {
     }
 
     // @ts-expect-error - entries() returns an iterator (see https://developer.mozilla.org/en-US/docs/Web/API/FileSystemDirectoryHandle/entries)
-    for await (const [ name ] of animDir.entries()) {
+    for await (const [name] of animDir.entries()) {
       try {
         await animDir.removeEntry(name);
       } catch (err) {
-        console.error(`Could not delete ${name}:`, err);
+        log.error(`Could not delete ${name}:`, err);
       }
     }
 
@@ -1193,7 +1188,7 @@ export async function clearAnimationsFromOPFS(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error("Error clearing animations from OPFS:", error);
+    log.error("Error clearing animations from OPFS:", error);
     return false;
   }
 }
@@ -1217,7 +1212,7 @@ export async function getAllAnimationsMetadataFromOPFS(): Promise<Array<{
 
     return metadataList;
   } catch (error) {
-    console.error("Error getting all animations metadata:", error);
+    log.error("Error getting all animations metadata:", error);
     return null;
   }
 }

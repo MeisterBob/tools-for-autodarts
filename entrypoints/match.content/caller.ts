@@ -1,8 +1,11 @@
-import { AutodartsToolsConfig, type IConfig, type ISoundTTS } from "@/utils/storage";
-import { getSoundFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
+import { AutodartsToolsConfig, type IConfig, type ISound, type ISoundTTS } from "@/utils/storage";
+import { getSoundFromIndexedDB, isIndexedDBAvailable } from "@/utils/helpers";
 import {
   registerGameDataCallback,
   unregisterGameDataCallback,
+  findMatchingItem,
+  TRIGGER_CATEGORIES,
+  TRIGGER_PRIORITIES,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import type { IGameData } from "@/utils/game-data-storage";
@@ -38,26 +41,6 @@ let currentAudioIndex = 0;
 // Tracking URLs that need to be revoked
 const blobUrlsToRevoke: string[] = [];
 
-function checkBoardStatus(boardData: IBoard): void {
-  const boardEvent = boardData.event;
-  const boardStatus = boardData.status;
-
-  if (boardEvent === "Started" && boardStatus === "Throw")
-    playSound("board_started");
-  else if (boardEvent === "Stopped" && boardStatus === "Stopped")
-    playSound("board_stopped");
-  else if (boardEvent === "Disconnected" && (boardStatus === "Offline" || boardStatus === ""))
-    playSound("board_stopped");
-  else if (boardEvent === "Manual reset" && boardStatus === "Throw")
-    playSound("manual_reset_done");
-  else if (boardEvent === "Takeout finished" && boardStatus === "Throw")
-    playSound("takeout_finished");
-  else if (boardEvent === "Calibration started")
-    playSound("calibration_started");
-  else if (boardEvent === "Calibration finished")
-    playSound("calibration_finished");
-}
-
 function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
   if (config.caller.enabled && config.caller.enabledGameModes.includes(gameMode))
     return true;
@@ -90,8 +73,8 @@ export async function caller() {
 
     if (!boardDataWatcherUnwatch) {
       boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
-        if (!config?.caller?.enabled) return;
-        checkBoardStatus(boardData);
+        if (config?.caller?.enabled)
+          handleBoardEvent(boardData, playSound);
       });
     }
   } catch (error) {
@@ -412,81 +395,48 @@ async function processGameDataFromTriggers(
     lastGameshotTimestamp = now;
   }
 
-  // Process checkout guide triggers if applicable
-  // if (gameData.match.state?.checkoutGuide?.length && gameData.match.turns[0].throws.length === 0) {
-  //   const currentPlayerIndex = gameData.match.player;
-  //   const currentScore = gameData.match.gameScores[currentPlayerIndex];
+  const sounds = findMatchingItem(config.caller.sounds, triggers);
+  if (!sounds) return;
 
-  //   if (currentScore > 0) {
-  //     // Try specific checkout sounds first (yr_XXX, you_require_XXX)
-  //     const checkoutTriggers = [
-  //       `yr_${currentScore}`,
-  //       `you_require_${currentScore}`,
-  //       "you_require",
-  //     ];
+  // one sound per trigger category (results are already score-sorted, so first wins)
+  const seenCategories = new Set<TRIGGER_CATEGORIES>();
+  const soundsToPlay = sounds.filter(s => {
+    if (seenCategories.has(s.category)) return false;
+    seenCategories.add(s.category);
+    return true;
+  });
 
-  //     for (const trigger of checkoutTriggers) {
-  //       const hasTrigger = config.caller.sounds?.some(sound =>
-  //         sound.enabled && sound.triggers && sound.triggers.includes(trigger),
-  //       );
-  //       if (hasTrigger) {
-  //         playSound(trigger);
-  //         // If it's the "you_require" fallback, also play the score
-  //         if (trigger === "you_require") {
-  //           playSound(`s${currentScore}`);
-  //         }
-  //         return;
-  //       }
-  //     }
-  //   }
-  // }
-
-  // Play sounds for each category (only one per category, highest priority)
-  const playedCategories = new Set<string>();
-  if (hasGameshot)
-    playedCategories.add("throw").add("total").add("remaining").add("board").add("other");
-  for (const trigger of triggers) {
-    // Only play the first configured trigger from each category (they're already sorted by priority)
-    if (!playedCategories.has(trigger.category) && playSound(trigger.trigger))
-      playedCategories.add(trigger.category);
+  log.info(triggers, soundsToPlay);
+  log.info(triggers.map(t => t.trigger).join(','), '=>', soundsToPlay.map(t => `[${t.item.triggers.join(',')}]`).join(','));
+  for (const sound of soundsToPlay) {
+    log.info(sound);
+    playSound(sound.item);
   }
 }
 
 /**
- * Play a sound based on the trigger
- * Adds the sound to a queue to be played sequentially
+ * Play a sound based on a trigger string (for event triggers, with fallback logic) or
+ * a pre-matched ISound (for game data triggers).
+ * Adds the sound to a queue to be played sequentially.
  */
-function playSound(trigger: string): boolean {
+function playSound(triggerOrSound: string | ISound): boolean {
   if (!config?.caller?.sounds || !config.caller.sounds.length) {
     log.info("No sounds configured");
     return false;
   }
 
-  // Find all sounds that match the trigger
-  let matchingSounds = config.caller.sounds.filter((sound) => {
-    if (!sound.enabled || !sound.triggers) return false;
-
-    // Check for direct match
-    if (sound.triggers.includes(trigger)) return true;
-
-    // Validate range triggers of sound
-    const triggerNum = Number(trigger);
-    if (!Number.isNaN(triggerNum)) {
-      const rangeTriggers = sound.triggers.map((t: string) => {
-        const match = t.match(triggerPatterns.ranges);
-        if (!match) return null;
-        return { min: Number(match[1]), max: Number(match[2]) };
-      }).filter(x => x !== null);
-
-      const hasMatchingRange = rangeTriggers.some(({ min, max }: { min: number; max: number }) => {
-        return triggerNum >= min && triggerNum <= max;
-      });
-
-      if (hasMatchingRange) return true;
+  if (typeof triggerOrSound !== "string") {
+    const soundToPlay = triggerOrSound;
+    if (soundToPlay.url || soundToPlay.base64 || soundToPlay.soundId || soundToPlay.tts) {
+      soundQueue.push({ url: soundToPlay.url, base64: soundToPlay.base64, name: soundToPlay.name, soundId: soundToPlay.soundId, tts: soundToPlay.tts });
+      if (!isPlaying) playNextSound();
     }
+    return true;
+  }
 
-    return false;
-  });
+  const trigger = triggerOrSound;
+  const _matched = findMatchingItem(config.caller.sounds, [{ trigger, priority: 0, category: TRIGGER_CATEGORIES.OTHER }]);
+  let matchingSounds: ISound[] = _matched ? _matched.map(s => s.item) : [];
 
   // If no direct match, try to find a fallback only for s, d, or t prefixes
   // For example, if "s41" is not found, try "41"
@@ -710,7 +660,7 @@ function playSound(trigger: string): boolean {
  * Play the next sound in the queue
  */
 async function playNextSound(): Promise<void> {
-  log.info(`Next sound, queue length: ${soundQueue.length}`);
+  log.info(`Next sound queue:`, soundQueue.map(s => s.name).join(', '));
 
   // If the queue is empty, we're done
   if (soundQueue.length === 0) {

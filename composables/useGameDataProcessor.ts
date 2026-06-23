@@ -1,5 +1,6 @@
 import { type IGameData, GameMode } from "@/utils/game-data-storage";
 import { AutodartsToolsGameData } from "@/utils/game-data-storage";
+import { triggerPatterns } from "@/utils/helpers";
 const log = createLogger("GameDataProcessor", { debug: false })
 
 /**
@@ -27,10 +28,8 @@ const log = createLogger("GameDataProcessor", { debug: false })
  *
  * ### Priority System
  * Each trigger has a priority level (higher number = higher priority, plays first):
- * - 100: Matchshot variant (player-specific)
- * - 99:  Matchshot
- * - 90:  Gameshot variant
- * - 89:  Gameshot
+ * - 100:  Matchshot
+ * - 90:  Gameshot
  * - 80:  Busted
  * - 70:  Player name / bot
  * - 60:  Combined throws (e.g., s1_d20_b)
@@ -119,7 +118,7 @@ const log = createLogger("GameDataProcessor", { debug: false })
  * Higher priority number = higher priority (more important to play)
  */
 export interface IGameTrigger {
-  trigger: string;
+  trigger: string | string[];
   priority: number;
   category: TRIGGER_CATEGORIES;
 }
@@ -164,19 +163,19 @@ export enum TRIGGER_CATEGORIES {
 
 /** Priority levels (higher = higher priority) */
 export enum TRIGGER_PRIORITIES {
-  OTHER = 10,               // Fallback triggers
-  BOARD_EVENT = 20,         // Board events
-  THROW = 25,               // throw
-  INDIVIDUAL_THROW = 30,    // Single throw (s1, d20, etc)
-  POINT_REMAINING = 40,     // Remaining points
-  POINT_TOTAL = 50,         // Total points of turn
-  COMBINED_THROWS = 60,     // Multiple throws combined (s1_d20_b)
-  PLAYER_NAME = 70,         // Player name or bot
-  BUSTED = 80,              // Turn busted
-  GAMESHOT = 89,            // Game won
-  GAMESHOT_VARIANT = 90,    // Player-specific gameshot (gameshot_playername)
-  MATCHSHOT = 99,           // Match won
-  MATCHSHOT_VARIANT = 100,  // Player-specific matchshot (matchshot_playername)
+  OTHER = 10,                  // Fallback triggers
+  BOARD_EVENT = 20,            // Board events
+  THROW = 25,                  // throw
+  INDIVIDUAL_THROW = 30,       // Single throw (s1, d20, etc)
+  POINT_REMAINING_COMMON = 39, // generalized Remaining points
+  POINT_REMAINING = 40,        // Remaining points
+  POINT_TOTAL = 50,            // Total points of turn
+  COMBINED_THROWS = 60,        // Multiple throws combined (s1_d20_b)
+  PLAYER_NAME_COMMON = 69,     // generalized Player name
+  PLAYER_NAME = 70,            // Player name or bot
+  BUSTED = 80,                 // Turn busted
+  GAMESHOT = 90,               // Game won
+  MATCHSHOT = 100,             // Match won
 }
 
 let gameDataWatcherUnwatch: (() => void) | null = null;
@@ -290,7 +289,8 @@ async function runCallback(
 
   // Apply priority overrides to triggers for this module
   const customizedTriggers = triggers.map(trigger => {
-    const override = options.priorityOverrides[trigger.trigger] ?? options.priorityOverrides[trigger.priority];
+    const triggerKey = Array.isArray(trigger.trigger) ? trigger.trigger.join('+') : trigger.trigger;
+    const override = options.priorityOverrides[triggerKey] ?? options.priorityOverrides[trigger.priority];
     return override !== undefined ? { ...trigger, priority: override } : trigger;
   });
 
@@ -322,7 +322,8 @@ async function processGameData(
 
   let triggers_list: string = "";
   triggers.forEach((trigger) => {
-    triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+    const triggerLabel = Array.isArray(trigger.trigger) ? `[${trigger.trigger.join(',')}]` : trigger.trigger;
+    triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${triggerLabel}`;
   });
   log.info("found triggers:", triggers_list);
 
@@ -353,26 +354,41 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
   const playerNameUnderscore = playerName.replace(/\s+/g, "_");
   const isBot = !!currentPlayer?.cpuPPR;
 
+  // Player / Bot
+  if (playerName) {
+    triggers.push({
+      trigger: playerName,
+      priority: TRIGGER_PRIORITIES.PLAYER_NAME,
+      category: TRIGGER_CATEGORIES.PLAYER,
+    });
+    if (playerNameUnderscore !== playerName) {
+      triggers.push({
+        trigger: playerNameUnderscore,
+        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
+        category: TRIGGER_CATEGORIES.PLAYER,
+      });
+    }
+  }
+  if (isBot) {
+    triggers.push({
+      trigger: "bot",
+      priority: TRIGGER_PRIORITIES.OTHER,
+      category: TRIGGER_CATEGORIES.OTHER,
+    });
+  }
+  triggers.push({
+    trigger: `player_${gameData.match.player + 1}`,
+    priority: TRIGGER_PRIORITIES.PLAYER_NAME_COMMON,
+    category: TRIGGER_CATEGORIES.PLAYER,
+  });
+
+  // Winner
   if (winnerMatch) {
     triggers.push({
       trigger: "matchshot",
       priority: TRIGGER_PRIORITIES.MATCHSHOT,
       category: TRIGGER_CATEGORIES.MATCH,
     });
-    if (playerName) {
-      triggers.push({
-        trigger: `matchshot_${playerName}`,
-        priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
-        category: TRIGGER_CATEGORIES.MATCH,
-      });
-      if (playerNameUnderscore !== playerName) {
-        triggers.push({
-          trigger: `matchshot_${playerNameUnderscore}`,
-          priority: TRIGGER_PRIORITIES.MATCHSHOT_VARIANT,
-          category: TRIGGER_CATEGORIES.MATCH,
-        });
-      }
-    }
   }
   if (winner) {
     triggers.push({
@@ -380,44 +396,10 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
       priority: TRIGGER_PRIORITIES.GAMESHOT,
       category: TRIGGER_CATEGORIES.MATCH,
     });
-    if (playerName) {
-      triggers.push({
-        trigger: `gameshot_${playerName}`,
-        priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
-        category: TRIGGER_CATEGORIES.MATCH,
-      });
-      if (playerNameUnderscore !== playerName) {
-        triggers.push({
-          trigger: `gameshot_${playerNameUnderscore}`,
-          priority: TRIGGER_PRIORITIES.GAMESHOT_VARIANT,
-          category: TRIGGER_CATEGORIES.MATCH,
-        });
-      }
-    }
   }
 
   // Bull-off handling
   if (gameData.match.variant === GameMode.BULL_OFF) {
-    if (isBot) {
-      triggers.push({
-        trigger: "bulloff_bot",
-        priority: TRIGGER_PRIORITIES.OTHER,
-        category: TRIGGER_CATEGORIES.OTHER,
-      });
-    } else {
-      triggers.push({
-        trigger: `bulloff_${playerName}`,
-        priority: TRIGGER_PRIORITIES.OTHER,
-        category: TRIGGER_CATEGORIES.OTHER,
-      });
-    }
-    if (playerName != playerNameUnderscore) {
-      triggers.push({
-        trigger: `bulloff_${playerNameUnderscore}`,
-        priority: TRIGGER_PRIORITIES.OTHER,
-        category: TRIGGER_CATEGORIES.OTHER,
-      });
-    }
     triggers.push({
       trigger: "bulloff",
       priority: TRIGGER_PRIORITIES.OTHER,
@@ -426,68 +408,36 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
     return triggers;
   }
 
-  // Player change detection
+  // Game start or Player changed
+  const isFirstThrow = gameData.match.turns[0].throws.length === 0;
+  if (isFirstThrow && gameData.match.round === 1 && gameData.match.player === 0) {
+    log.info("first throw -> gameon");
+    triggers.push({
+      trigger: "gameon",
+      priority: TRIGGER_PRIORITIES.PLAYER_NAME,
+      category: TRIGGER_CATEGORIES.PLAYER,
+    });
+
+  }
   const playerChanged =
     oldGameData?.match?.player !== undefined &&
     gameData.match.player !== undefined &&
     oldGameData.match.player !== gameData.match.player;
-
-  const isFirstThrow = gameData.match.turns[0].throws.length === 0;
-  if (isFirstThrow || playerChanged || (winnerMatch || winner)) {
-    if (isBot) {
-      triggers.push({
-        trigger: "bot",
-        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: TRIGGER_CATEGORIES.PLAYER,
-      });
-      triggers.push({
-        trigger: "bot_throw",
-        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: TRIGGER_CATEGORIES.PLAYER,
-      });
-    } else if (playerName) {
-      triggers.push({
-        trigger: playerName,
-        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: TRIGGER_CATEGORIES.PLAYER,
-      });
-      if (playerName != playerNameUnderscore) {
-        triggers.push({
-          trigger: playerNameUnderscore,
-          priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-          category: TRIGGER_CATEGORIES.PLAYER,
-        });
-      }
-      triggers.push({
-        trigger: `player_${gameData.match.player + 1}`,
-        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: TRIGGER_CATEGORIES.PLAYER,
-      });
-    }
-
-    // gameon trigger for start of match
-    if (gameData.match.round === 1 && gameData.match.player === 0) {
-      triggers.push({
-        trigger: "gameon",
-        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: TRIGGER_CATEGORIES.PLAYER,
-      });
-    } else if (playerChanged) {
-      triggers.push({
-        trigger: "next_player",
-        priority: TRIGGER_PRIORITIES.PLAYER_NAME,
-        category: TRIGGER_CATEGORIES.PLAYER,
-      });
-    }
+  if (playerChanged) {
+    log.info("player changed -> next_player");
+    triggers.push({
+      trigger: "next_player",
+      priority: TRIGGER_PRIORITIES.PLAYER_NAME_COMMON,
+      category: TRIGGER_CATEGORIES.PLAYER,
+    });
   }
 
-  // Throw-based triggers (only if there are throws)
+  // Throw-based triggers
   if (gameData.match.turns[0].throws.length > 0) {
     const currentThrow = gameData.match.turns[0].throws[gameData.match.turns[0].throws.length - 1];
     if (currentThrow) {
       const throwName = currentThrow.segment.name.toLowerCase();
       const throwBed = currentThrow.segment.bed;
-      const isFirstThrow = gameData.match.turns[0].throws.length == 0;
       const isLastThrow = gameData.match.turns[0].throws.length >= 3;
       const busted = gameData.match.turns[0].busted;
       const points = gameData.match.turns[0].points;
@@ -584,8 +534,8 @@ function deriveGameTriggers(gameData: IGameData, oldGameData: IGameData): IGameT
         category: TRIGGER_CATEGORIES.THROW,
       });
       triggers.push({
-        trigger: "you_require",
-        priority: TRIGGER_PRIORITIES.POINT_REMAINING,
+        trigger: ["you_require", `${currentScore}`],
+        priority: TRIGGER_PRIORITIES.POINT_REMAINING_COMMON,
         category: TRIGGER_CATEGORIES.THROW,
       });
     }
@@ -722,6 +672,162 @@ function deriveVariantSpecificTriggers(gameData: IGameData, oldGameData: IGameDa
   log.info("deriveVariantSpecificTriggers: Triggers:", triggers);
 
   return triggers;
+}
+
+export function handleBoardEvent(boardData: IBoard, handler: (trigger: string) => void): void {
+  const boardEvent: string | undefined = boardData.event;
+  const boardStatus: string | undefined = boardData.status;
+
+  if ((boardEvent === "Starting" && (boardStatus === "" || boardStatus === "Starting")) ||
+    (boardEvent === "start" && boardStatus === ""))
+    handler("board_starting");
+  else if (boardEvent === "Started" && boardStatus === "Throw")
+    handler("board_started");
+  else if (boardEvent === "Stopping" && boardStatus === "Stopping")
+    handler("board_stopping");
+  else if (boardEvent === "Stopped" && boardStatus === "Stopped")
+    handler("board_stopped");
+  else if (boardEvent === "Disconnected" && (boardStatus === "Offline" || boardStatus === ""))
+    handler("board_stopped");
+  else if (boardEvent === "Manual reset" && boardStatus === "Throw")
+    handler("manual_reset_done");
+  else if (boardEvent === "Throw detected" && boardStatus === "Throw")
+    handler("throw");
+  else if (boardEvent === "Throw detected" && boardStatus === "Takeout")
+    handler("last_throw");
+  else if (boardEvent === "Takeout started" && boardStatus === "Takeout in progress")
+    handler("takeout");
+  else if (boardEvent === "Takeout finished" && boardStatus === "Throw")
+    handler("takeout_finished");
+  else if (boardEvent === "Calibration started")
+    handler("calibration_started");
+  else if (boardEvent === "Calibration finished")
+    handler("calibration_finished");
+  else
+    log.info(`Board: event '${boardEvent}' with status '${boardStatus}' was unhandled`);
+}
+
+/**
+ * Find the best matching item from a list based on active game triggers.
+ * An item matches when ALL '+'-separated parts of at least one of its trigger strings
+ * are present in the active triggers. The score is the sum of the priorities of the
+ * matched parts; compound triggers naturally outscore single-trigger items.
+ * Among tied scores, one is chosen at random.
+ */
+export function findMatchingItem<T extends { enabled: boolean; triggers: string[] }>(
+  items: T[],
+  triggers: IGameTrigger[],
+  selectPlayerName: boolean = false
+): Array<{ item: T; score: number; matchedTrigger: string | string[]; category: TRIGGER_CATEGORIES }> | false {
+  const triggerNames = new Set<string>();
+  const priorityMap = new Map<string, number>();
+  const categoryMap = new Map<string, TRIGGER_CATEGORIES>();
+  const arrayTriggers: Array<{ parts: string[]; priority: number; category: TRIGGER_CATEGORIES }> = [];
+
+  for (const t of triggers) {
+    if (Array.isArray(t.trigger)) {
+      for (const name of t.trigger) triggerNames.add(name);
+      arrayTriggers.push({ parts: t.trigger, priority: t.priority, category: t.category });
+    } else {
+      triggerNames.add(t.trigger);
+      priorityMap.set(t.trigger, t.priority);
+      categoryMap.set(t.trigger, t.category);
+    }
+  }
+
+  log.info("triggerNames", triggerNames);
+
+  function triggerIncludes(name: string): boolean {
+    return triggers.some(t => Array.isArray(t.trigger) ? t.trigger.includes(name) : t.trigger === name);
+  }
+
+  // always allow player_name trigger on round start and player change
+  if (triggerIncludes('next_player') || triggerIncludes('gameon'))
+    selectPlayerName = true;
+  const playerNameTriggerNames = selectPlayerName ? null : new Set(
+    triggers
+      .filter(t => t.category === TRIGGER_CATEGORIES.PLAYER &&
+        (t.priority === TRIGGER_PRIORITIES.PLAYER_NAME || t.priority === TRIGGER_PRIORITIES.PLAYER_NAME_COMMON))
+      .flatMap(t => Array.isArray(t.trigger) ? t.trigger : [t.trigger]),
+  );
+
+  function matchScore(effectTrigger: string): number {
+    const rangeParts = effectTrigger.match(triggerPatterns.ranges);
+    if (rangeParts) {
+      const min = Number(rangeParts[1]);
+      const max = Number(rangeParts[2]);
+      for (const [name, priority] of priorityMap) {
+        const points = Number(name);
+        if (!Number.isNaN(points) && min <= points && points <= max) return priority;
+      }
+      return -Infinity;
+    }
+
+    const parts = effectTrigger.split('+');
+    if (!parts.every(p => triggerNames.has(p))) return -Infinity;
+    if (playerNameTriggerNames && parts.length === 1 && playerNameTriggerNames.has(parts[0])) return -Infinity;
+
+    // Check if a compound array trigger covers all parts — use its priority per part
+    for (const at of arrayTriggers) {
+      if (parts.length === at.parts.length && parts.every(p => at.parts.includes(p)))
+        return at.priority * parts.length;
+    }
+
+    return parts.reduce((sum, p) => sum + (priorityMap.get(p) ?? 0), 0);
+  }
+
+  function matchCategory(parts: string[]): TRIGGER_CATEGORIES {
+    for (const at of arrayTriggers) {
+      if (parts.length === at.parts.length && parts.every(p => at.parts.includes(p)))
+        return at.category;
+    }
+    let best = TRIGGER_CATEGORIES.OTHER;
+    let bestPriority = -Infinity;
+    for (const p of parts) {
+      const priority = priorityMap.get(p) ?? -Infinity;
+      if (priority > bestPriority) { bestPriority = priority; best = categoryMap.get(p) ?? TRIGGER_CATEGORIES.OTHER; }
+    }
+    return best;
+  }
+
+  const candidates: Array<{ item: T; score: number; matchedTrigger: string | string[]; category: TRIGGER_CATEGORIES }> = [];
+  for (const item of items) {
+    if (!item.enabled) continue;
+    let bestScore = -Infinity;
+    let bestTrigger: string | string[] = "";
+    let bestCategory = TRIGGER_CATEGORIES.OTHER;
+    for (const t of item.triggers) {
+      const s = matchScore(t);
+      if (s > bestScore) {
+        bestScore = s;
+        const parts = t.split('+');
+        bestTrigger = parts.length > 1 ? parts : t;
+        bestCategory = matchCategory(Array.isArray(bestTrigger) ? bestTrigger : [bestTrigger]);
+      }
+    }
+    if (bestScore > -Infinity) candidates.push({ item, score: bestScore, matchedTrigger: bestTrigger, category: bestCategory });
+  }
+
+  if (!candidates.length) return false;
+
+  candidates.sort((a, b) => b.score - a.score);
+
+  // Group by matched trigger, keeping only the top score per trigger, then pick one randomly
+  const triggerGroups = new Map<string, typeof candidates>();
+  for (const c of candidates) {
+    const key = Array.isArray(c.matchedTrigger) ? c.matchedTrigger.join('+') : c.matchedTrigger;
+    if (!triggerGroups.has(key)) {
+      triggerGroups.set(key, [c]);
+    } else {
+      const group = triggerGroups.get(key)!;
+      if (c.score === group[0].score) group.push(c);
+    }
+  }
+
+  const filtered = Array.from(triggerGroups.values())
+    .map(group => group[Math.floor(Math.random() * group.length)]);
+  filtered.sort((a, b) => b.score - a.score);
+  return filtered;
 }
 
 /**

@@ -458,7 +458,7 @@ import { backgroundFetch, deleteAnimationFromOPFS, getAnimationFromOPFS, getAnim
 import { AutodartsToolsConfig, type IAnimation, type IConfig, defaultConfig } from "@/utils/storage";
 
 import { createLogger } from "@/utils/logger";
-const { log_dbg, log_inf, log_wrn, log_err } = createLogger("Animations");
+const log = createLogger("Animations");
 
 const emit = defineEmits([ "toggle", "settingChange" ]);
 const { notification, showNotification, hideNotification } = useNotification();
@@ -566,7 +566,7 @@ async function loadAnimationSource(animation: IAnimation) {
         return;
       }
     } catch (error) {
-      log_err("Error loading animation from OPFS:", error);
+      log.error("Error loading animation from OPFS:", error);
     }
   }
   // Fallback to URL if animation is not stored in OPFS
@@ -646,7 +646,7 @@ watch(config, async (_, oldValue) => {
 
   await AutodartsToolsConfig.setValue(toRaw(config.value ?? defaultConfig));
   emit("settingChange");
-  log_inf("Animations setting changed");
+  log.info("Animations setting changed");
 }, { deep: true });
 
 function initSortable() {
@@ -708,7 +708,7 @@ async function getGifDurationFromUrl(url) {
   try {
     const response = await backgroundFetch(url);
     if (!response.ok || !response.data) {
-      log_err(`fetching ${url} failed`, response);
+      log.error(`fetching ${url} failed`, response);
       return 0;
     }
     let uint8: Uint8Array;
@@ -734,7 +734,7 @@ async function getGifDurationFromUrl(url) {
     }
     return duration;
   } catch (error) {
-    log_err("Error calculating GIF duration:", error);
+    log.error("Error calculating GIF duration:", error);
     return null;
   }
 }
@@ -856,7 +856,7 @@ function removeAnimation(index: number) {
     // If animation is stored in OPFS, delete it
     const animation = config.value.animations.data[index];
     if (animation.animationId && isOPFSAvailable()) {
-      deleteAnimationFromOPFS(animation.animationId).catch(log_err);
+      deleteAnimationFromOPFS(animation.animationId).catch(log.error);
       // Also remove from sources cache
       delete animationSources.value[animation.animationId];
     }
@@ -1003,7 +1003,7 @@ async function processGifFiles() {
           throw new Error("Failed to save animation to browser storage");
         }
       } catch (error) {
-        log_err(`Error processing file ${file.name}:`, error);
+        log.error(`Error processing file ${file.name}:`, error);
         showNotification(`Failed to process ${file.name}`, "error");
       }
     }
@@ -1020,7 +1020,7 @@ async function processGifFiles() {
     // Update intersection observer to detect newly added animations
     updateIntersectionObserverForNewAnimations();
   } catch (error) {
-    log_err("Error processing files:", error);
+    log.error("Error processing files:", error);
     showNotification("Error processing files", "error");
   } finally {
     isGifProcessing.value = false;
@@ -1054,7 +1054,7 @@ async function deleteAllAnimations() {
   // Update config
   await AutodartsToolsConfig.setValue(toRaw(config.value));
   emit("settingChange");
-  log_inf("setting changed");
+  log.info("setting changed");
 
   // Close modal and show notification
   closeDeleteAllModal();

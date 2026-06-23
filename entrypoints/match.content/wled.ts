@@ -5,10 +5,12 @@ import { AutodartsToolsLobbyData } from "@/utils/lobby-data-storage";
 import { AutodartsToolsBoardData, type IBoard } from "@/utils/board-data-storage";
 import { AutodartsToolsTournamentData, type ITournament } from "@/utils/tournament-data-storage";
 import { AutodartsToolsConfig, type IConfig, type IWled } from "@/utils/storage";
-import { triggerPatterns } from "@/utils/helpers";
 import {
   registerGameDataCallback,
   unregisterGameDataCallback,
+  handleBoardEvent,
+  findMatchingItem,
+  TRIGGER_CATEGORIES,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import { WledType } from "#imports";
@@ -23,7 +25,7 @@ let config: IConfig;
 let currentBoardId: string;
 
 function eventTrigger(trigger: string) {
-  if (isTriggerPresent(trigger) &&
+  if (findMatchingItem(config.wledFx.effects ?? [], [{ trigger, priority: 0, category: TRIGGER_CATEGORIES.OTHER }]) &&
     (
       config!.wledFx.boardIds.length === 0 ||
       (
@@ -39,40 +41,6 @@ function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
   if (config.wledFx.enabled && config.wledFx.enabledGameModes.includes(gameMode))
     return true;
   return false;
-}
-
-async function checkStatus(boardData: IBoard): Promise<void> {
-  const boardEvent: string | undefined = boardData.event;
-  const boardStatus: string | undefined = boardData.status;
-
-  log.info(`Board: event '${boardEvent}', status '${boardStatus}'`);
-  if ((boardEvent === "Starting" && (boardStatus === "" || boardStatus === "Starting")) ||
-    (boardEvent === "start" && boardStatus === ""))
-    eventTrigger("board_starting");
-  else if (boardEvent === "Started" && boardStatus === "Throw")
-    eventTrigger("board_started");
-  else if (boardEvent === "Stopping" && boardStatus === "Stopping")
-    eventTrigger("board_stopping");
-  else if (boardEvent === "Stopped" && boardStatus === "Stopped")
-    eventTrigger("board_stopped");
-  else if (boardEvent === "Disconnected" && (boardStatus === "Offline" || boardStatus === ""))
-    eventTrigger("board_stopped");
-  else if (boardEvent === "Manual reset" && boardStatus === "Throw")
-    eventTrigger("manual_reset_done");
-  else if (boardEvent === "Throw detected" && boardStatus === "Throw")
-    eventTrigger("throw");
-  else if (boardEvent === "Throw detected" && boardStatus === "Takeout")
-    eventTrigger("last_throw");
-  else if (boardEvent === "Takeout started" && boardStatus === "Takeout in progress")
-    eventTrigger("takeout");
-  else if (boardEvent === "Takeout finished" && boardStatus === "Throw")
-    eventTrigger("takeout_finished");
-  else if (boardEvent === "Calibration started")
-    eventTrigger("calibration_started");
-  else if (boardEvent === "Calibration finished")
-    eventTrigger("calibration_finished");
-  else
-    log.info(`Board: event '${boardEvent}' with status '${boardStatus}' was unhandled`);
 }
 
 export async function wledFx() {
@@ -115,7 +83,7 @@ export async function wledFx() {
 
     if (!boardDataWatcherUnwatch) {
       boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
-        checkStatus(boardData).catch(log.error);
+        handleBoardEvent(boardData, eventTrigger);
       });
     }
 
@@ -173,11 +141,11 @@ async function processGameDataFromTriggers(
 ): Promise<void> {
   if (!gameData.match || !gameData.match.turns?.length) return;
 
-  // let triggers_list: string = "";
-  // triggers.forEach((trigger) => {
-  //   triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
-  // });
-  // log.info("processing triggers", triggers_list)
+  let triggers_list: string = "";
+  triggers.forEach((trigger) => {
+    triggers_list += `\n${trigger.category.padStart(10)} | ${String(trigger.priority).padStart(3)} | ${trigger.trigger}`;
+  });
+  log.debug("processing triggers", triggers_list)
 
   currentBoardId = gameData.match.players?.[gameData.match.player].boardId;
 
@@ -192,55 +160,25 @@ async function processGameDataFromTriggers(
   // Check board filtering if configured
   if (
     config.wledFx.boardIds.length > 0 &&
-    isTriggerPresent("other") &&
+    findMatchingItem(config.wledFx.effects ?? [], [{ trigger: "other", priority: 0, category: TRIGGER_CATEGORIES.OTHER }]) &&
     !config.wledFx.boardIds.includes(currentBoardId)
   ) {
     setEffectByTrigger("other");
     return;
   }
 
-  // Set effect based on the highest priority trigger that is available
-  for (const i in triggers) {
-    log.info("trying", triggers[i].trigger);
-    if (isTriggerPresent(triggers[i].trigger)) {
-      setEffectByTrigger(triggers[i].trigger);
-      return;
-    }
+  // Find the highest-priority effect whose trigger conditions are all met
+  const matchedEffect = findMatchingItem(config.wledFx.effects ?? [], triggers);
+  if (matchedEffect) {
+    log.info(`Playing effect "${matchedEffect[0].item.name}"`);
+    await setEffect(matchedEffect[0].item);
+    return;
   }
 
   // no effect was available, fall back to gameon
   setEffectByTrigger("gameon");
 }
 
-function isTriggerPresent(trigger: string): boolean {
-  const present: boolean = config.wledFx.effects?.some(
-    effect => effect.enabled && effect?.triggers.includes(trigger),
-  );
-  if (present) {
-    log.info("isTriggerPresent: found trigger", trigger);
-    return present;
-  }
-
-  // search for range trigger(range_[min]_[max])
-  const points = Number(trigger);
-  if (Number.isNaN(points)) return false;
-  const range_triggers = config.wledFx.effects?.filter(
-    effect =>
-      effect.enabled && effect?.triggers.some(trigger => trigger.match(triggerPatterns.ranges)),
-  );
-  for (let i = 0; i < range_triggers.length; i++) {
-    const element = range_triggers[i];
-    for (let j = 0; j < element.triggers.length; j++) {
-      const parts = element.triggers[j].match(triggerPatterns.ranges);
-      if (!parts) continue;
-      const min = Number(parts[1]);
-      const max = Number(parts[2]);
-      if (min <= points && points <= max) return true;
-    }
-  }
-
-  return false;
-}
 
 /**
  * Set an effect based on the trigger

@@ -1,8 +1,10 @@
 import { AutodartsToolsConfig, type IConfig, type ISound, type ISoundTTS } from "@/utils/storage";
-import { getSoundFxFromIndexedDB, isIndexedDBAvailable, triggerPatterns } from "@/utils/helpers";
+import { getSoundFxFromIndexedDB, isIndexedDBAvailable } from "@/utils/helpers";
 import {
   registerGameDataCallback,
   unregisterGameDataCallback,
+  handleBoardEvent,
+  findMatchingItem,
   type IGameTrigger,
 } from "@/composables/useGameDataProcessor";
 import type { IGameData } from "@/utils/game-data-storage";
@@ -49,26 +51,6 @@ let currentAudioIndex2 = 0;
 // Tracking URLs that need to be revoked
 const blobUrlsToRevoke: string[] = [];
 
-function checkBoardStatus(boardData: IBoard): void {
-  const boardEvent = boardData.event;
-  const boardStatus = boardData.status;
-
-  if (boardEvent === "Started" && boardStatus === "Throw")
-    playSound("ambient_board_started", 2);
-  else if (boardEvent === "Stopped" && boardStatus === "Stopped")
-    playSound("ambient_board_stopped", 2);
-  else if (boardEvent === "Disconnected" && (boardStatus === "Offline" || boardStatus === ""))
-    playSound("ambient_board_stopped", 2);
-  else if (boardEvent === "Manual reset" && boardStatus === "Throw")
-    playSound("ambient_manual_reset_done", 2);
-  else if (boardEvent === "Takeout finished" && boardStatus === "Throw")
-    playSound("ambient_takeout_finished", 2);
-  else if (boardEvent === "Calibration started")
-    playSound("ambient_calibration_started", 2);
-  else if (boardEvent === "Calibration finished")
-    playSound("ambient_calibration_finished", 2);
-}
-
 function _is_enabled(config: IConfig, gameMode: GameMode): boolean {
   if (config.soundFx.enabled && config.soundFx.enabledGameModes.includes(gameMode))
     return true;
@@ -101,21 +83,21 @@ export async function soundFx() {
         if ((_lobbyData.players?.length ?? 0) > (_oldLobbyData.players?.length ?? 0) && (_lobbyData.players?.length ?? 0) > 1) {
           const currentURL = window.location.href;
           if (!currentURL.includes("lobbies")) return;
-          playSound("ambient_lobby_in", 2);
+          playSound("lobby_in", 2);
         }
 
         if ((_lobbyData.players?.length ?? 0) < (_oldLobbyData.players?.length ?? 0) && (_lobbyData.players?.length ?? 0) > 0) {
           const currentURL = window.location.href;
           if (!currentURL.includes("lobbies")) return;
-          playSound("ambient_lobby_out", 2);
+          playSound("lobby_out", 2);
         }
       });
     }
 
     if (!boardDataWatcherUnwatch) {
       boardDataWatcherUnwatch = AutodartsToolsBoardData.watch((boardData: IBoard) => {
-        if (!config?.soundFx?.enabled) return;
-        checkBoardStatus(boardData);
+        if (config?.soundFx?.enabled)
+          handleBoardEvent(boardData, playSound);
       });
     }
 
@@ -127,7 +109,7 @@ export async function soundFx() {
         const bodyText = document.body.textContent || document.body.innerText;
         if (bodyText.includes("Time to ready up") || bodyText.includes("Zeit zum bereitmachen") || bodyText.includes("Tijd om je klaar te maken")) {
           log.info("Found 'Time to ready up' text, playing tournament ready sound");
-          playSound("ambient_tournament_ready");
+          playSound("tournament_ready");
 
           // Disconnect the observer after playing the sound once
           if (tournamentReadyObserver) {
@@ -533,65 +515,37 @@ async function processGameDataFromTriggers(
     lastGameshotTimestamp = now;
   }
 
-  for (const trigger of triggers)
-    if (playSound(trigger.trigger) && trigger.category === TRIGGER_CATEGORIES.MATCH)
-      return;
+  const sound = findMatchingItem(config.soundFx.sounds, triggers);
+  if (sound) {
+    log.info("playing", sound);
+    playSound(sound[0].item);
+  } else {
+    log.info("no sound found");
+  }
 }
 
 /**
- * Play a sound based on the trigger
- * Adds the sound to a queue to be played sequentially
+ * Play a sound based on a trigger string (for event triggers) or a pre-matched ISound
+ * (for game data triggers). Adds the sound to a queue to be played sequentially.
  */
-function playSound(trigger: string, soundChannel: number = 1): boolean {
+function playSound(triggerOrSound: string | ISound, soundChannel: number = 1): boolean {
   if (!config?.soundFx?.sounds || !config.soundFx.sounds.length) {
     log.info("No sounds configured");
     return false;
   }
 
-  // Find all sounds that match the trigger
-  let matchingSounds = config.soundFx.sounds.filter((sound) => {
-    if (!sound.enabled || !sound.triggers) return false;
-
-    // Check for direct match
-    if (sound.triggers.includes(trigger)) return true;
-
-    // Validate range triggers of sound
-    // Extract number from trigger
-    let triggerNum = Number(trigger);
-
-    if (!Number.isNaN(triggerNum)) {
-      const rangeTriggers = sound.triggers.map((t: string) => {
-        const match = t.match(triggerPatterns.ranges);
-        if (!match) return null;
-        return { min: Number(match[1]), max: Number(match[2]), original: t };
-      }).filter(x => x !== null);
-
-      const hasMatchingRange = rangeTriggers.some((rangeTrigger) => {
-        const { min, max, original } = rangeTrigger;
-        const matches = triggerNum >= min && triggerNum <= max;
-        if (matches) {
-          log.info(`Range trigger "${original}" matches ${triggerNum} (range: ${min}-${max})`);
-        }
-        return matches;
-      });
-
-      if (hasMatchingRange) return true;
+  let soundToPlay: ISound | false;
+  if (typeof triggerOrSound === "string") {
+    soundToPlay = findMatchingItem(config.soundFx.sounds, [{ trigger: triggerOrSound, priority: 0, category: TRIGGER_CATEGORIES.OTHER }])[0];
+    if (!soundToPlay) {
+      log.info(`No sound found for trigger "${triggerOrSound}" (channel ${soundChannel})`);
+      return false;
     }
-
-    return false;
-  });
-
-  if (!matchingSounds.length) {
-    log.info(`No sound found for trigger "${trigger}" (channel ${soundChannel})`);
-    return false;
+  } else {
+    soundToPlay = triggerOrSound;
   }
 
-  // we found matching sounds
-  // If multiple sounds match the trigger, pick a random one
-  const randomIndex = Math.floor(Math.random() * matchingSounds.length);
-  const soundToPlay = matchingSounds[randomIndex];
-
-  log.info(`Found matching sound for "${trigger}" "${soundToPlay.name}" (channel ${soundChannel})`);
+  log.info(`Found matching sound "${soundToPlay.name}" (channel ${soundChannel})`);
 
   // Check if there's a soundId that we need to load from IndexedDB
   if (soundToPlay.soundId && isIndexedDBAvailable()) {

@@ -3,6 +3,8 @@ import { AutodartsToolsBoardImages } from "./board-image-storage";
 import { AutodartsToolsGameData } from "./game-data-storage";
 import { AutodartsToolsLobbyData } from "./lobby-data-storage";
 import { AutodartsToolsTournamentData, type ITournament } from "./tournament-data-storage";
+import { createLogger } from "@/utils/logger";
+const log = createLogger("websocket Helper")
 
 interface IUserSettings {
   callCheckouts: boolean;
@@ -317,8 +319,8 @@ export async function processWebSocketMessage(channel: string, data: ILobbies | 
       break;
     }
     default: {
-      console.log("Autodarts Tools: Websocket: Unknown channel", channel);
-      // console.log(data);
+      log.info("Unknown channel", channel);
+      // log.info(data);
 
       break;
     }
