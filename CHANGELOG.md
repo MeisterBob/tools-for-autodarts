@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Fixed `opponent_throw` Sound FX trigger firing for players who share your board
+  - A guest playing on your board with their own Autodarts account (e.g. a friend visiting) is no longer treated as a remote opponent, so their throws don't double up with the throw noise from your physical board
+  - The trigger now only fires for opponents on a different board, comparing the thrower's board to your own
+  - Reported in #170 by @a-jey
+
 ## [2.3.0] - 2026-06-22
 
 ### Added

@@ -231,7 +231,7 @@ Add sound effects for various game events:
   - `ambient_next_player`: Plays when switching to the next player (fallback if no player name sound exists)
   - `ambient_bot`: Plays when switching to a CPU/bot player
   - `bot_throw`: Plays when a bot player throws a dart
-  - `opponent_throw`: Plays when a remote opponent (any real player other than you) throws a dart — useful as throw feedback when playing online without looking at the screen. Your own throws and bot throws are excluded (bots use `bot_throw`)
+  - `opponent_throw`: Plays when a remote opponent (any real player other than you, on a different board) throws a dart — useful as throw feedback when playing online without looking at the screen. Your own throws and bot throws are excluded (bots use `bot_throw`), and so are players sharing your board (e.g. a friend visiting to play on your board with their own account) since that board already makes the throw noise
   - Player-specific sounds using format: `ambient_playername` or `ambient_player_name`
 - **Lobby Sounds**:
   - `ambient_lobby_in`: Plays when a player joins the lobby

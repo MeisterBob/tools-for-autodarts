@@ -695,7 +695,14 @@ async function processGameData(gameData: IGameData, oldGameData: IGameData, from
   if (isNewThrow && !isBot && currentPlayer?.userId) {
     if (!localUserId) localUserId = await getUserIdFromToken();
     if (localUserId && currentPlayer.userId !== localUserId) {
-      playSound("opponent_throw", 2);
+      // A guest with their own account playing on your board (e.g. a friend visiting) throws on the
+      // same physical board as you, so that board already makes the throw noise. Only fire for a truly
+      // remote opponent on a different board — compare the thrower's board to the local user's board.
+      const localBoardId = gameData.match.players?.find(player => player.userId === localUserId)?.boardId;
+      const isSameBoardAsLocalUser = !!localBoardId && currentPlayer.boardId === localBoardId;
+      if (!isSameBoardAsLocalUser) {
+        playSound("opponent_throw", 2);
+      }
     }
   }
 

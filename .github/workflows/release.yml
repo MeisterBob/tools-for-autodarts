@@ -405,14 +405,37 @@ jobs:
           </dict>
           </plist>
           EOF
-          xcodebuild -exportArchive \
-            -archivePath "./build/AppStore.xcarchive" \
-            -exportOptionsPlist "ExportOptions-iOS.plist" \
-            -exportPath "./build/AppStoreExport-iOS" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
-            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+          # Apple's App Store Connect upload servers intermittently return
+          # transient errors (e.g. "503 Service Temporarily Unavailable").
+          # Retry the export+upload a few times with backoff before failing.
+          max_attempts=5
+          attempt=1
+          while true; do
+            echo "::group::iOS App Store upload attempt ${attempt}/${max_attempts}"
+            rm -rf "./build/AppStoreExport-iOS"
+            if xcodebuild -exportArchive \
+              -archivePath "./build/AppStore.xcarchive" \
+              -exportOptionsPlist "ExportOptions-iOS.plist" \
+              -exportPath "./build/AppStoreExport-iOS" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
+              -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+              -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}; then
+              echo "::endgroup::"
+              echo "✅ iOS upload succeeded on attempt ${attempt}"
+              break
+            fi
+            echo "::endgroup::"
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              echo "❌ iOS upload failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            wait_s=$((attempt * 60))
+            echo "⚠️ iOS upload attempt ${attempt} failed (often a transient App Store Connect 503). Retrying in ${wait_s}s..."
+            sleep "${wait_s}"
+            attempt=$((attempt + 1))
+          done
 
       # ── macOS Build ──────────────────────────────────────────────────
       - name: Configure code signing for macOS
@@ -502,14 +525,35 @@ jobs:
           </dict>
           </plist>
           EOF
-          xcodebuild -exportArchive \
-            -archivePath "./build/AppStoreMac.xcarchive" \
-            -exportOptionsPlist "ExportOptions-macOS.plist" \
-            -exportPath "./build/AppStoreExport-macOS" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
-            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+          # Same transient-503 retry handling as the iOS upload above.
+          max_attempts=5
+          attempt=1
+          while true; do
+            echo "::group::macOS App Store upload attempt ${attempt}/${max_attempts}"
+            rm -rf "./build/AppStoreExport-macOS"
+            if xcodebuild -exportArchive \
+              -archivePath "./build/AppStoreMac.xcarchive" \
+              -exportOptionsPlist "ExportOptions-macOS.plist" \
+              -exportPath "./build/AppStoreExport-macOS" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath $RUNNER_TEMP/AuthKey.p8 \
+              -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+              -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}; then
+              echo "::endgroup::"
+              echo "✅ macOS upload succeeded on attempt ${attempt}"
+              break
+            fi
+            echo "::endgroup::"
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              echo "❌ macOS upload failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            wait_s=$((attempt * 60))
+            echo "⚠️ macOS upload attempt ${attempt} failed (often a transient App Store Connect 503). Retrying in ${wait_s}s..."
+            sleep "${wait_s}"
+            attempt=$((attempt + 1))
+          done
 
       # ── Submit both platforms ────────────────────────────────────────
       - name: Submit for App Store Review
