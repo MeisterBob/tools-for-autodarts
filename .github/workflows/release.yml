@@ -641,10 +641,27 @@ jobs:
           
           # Verify the file was downloaded
           ls -la .output/
-          
+
+      - name: Extract build number from IPA
+        id: ipa_build
+        run: |
+          # AltStore 2.0+ verifies the source's buildVersion against the app's real
+          # CFBundleVersion. That value is a date-based build number (e.g. 2026062201)
+          # set by update-xcode-version.ts, NOT the marketing version — so read it
+          # straight from the built IPA to guarantee an exact match.
+          mkdir -p .output/ipa_extracted
+          unzip -o -q .output/autodarts-tools-ios.ipa -d .output/ipa_extracted
+          BUILD_VERSION=$(python3 -c "import plistlib, glob; p = glob.glob('.output/ipa_extracted/Payload/*.app/Info.plist')[0]; print(plistlib.load(open(p, 'rb'))['CFBundleVersion'])")
+          if [ -z "$BUILD_VERSION" ]; then
+            echo "ERROR: could not read CFBundleVersion from IPA"
+            exit 1
+          fi
+          echo "Extracted CFBundleVersion: $BUILD_VERSION"
+          echo "build_version=$BUILD_VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Update AltStore Source
         run: |
-          node scripts/update-altstore-source.js "${{ needs.draft_release.outputs.version }}" "${{ needs.draft_release.outputs.prerelease }}"
+          node scripts/update-altstore-source.js "${{ needs.draft_release.outputs.version }}" "${{ needs.draft_release.outputs.prerelease }}" "${{ steps.ipa_build.outputs.build_version }}"
           
       - name: Commit and Push Changes
         run: |

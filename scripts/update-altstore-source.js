@@ -10,8 +10,16 @@ const __dirname = path.dirname(__filename);
 const version = process.argv[2] || JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
 const isPrerelease = process.argv[3] === 'true';
 
+// The actual CFBundleVersion baked into the IPA (a date-based build number such as
+// 2026062201, set by update-xcode-version.ts). AltStore 2.0+ verifies the source's
+// buildVersion against the app's real CFBundleVersion, so this must match exactly —
+// using the marketing version here causes "does not match the build number" install
+// failures. Falls back to the marketing version only when not provided (e.g. local runs).
+const buildVersion = process.argv[4] || version;
+
 console.log(`Updating AltStore source for version: ${version}`);
 console.log(`Is prerelease: ${isPrerelease}`);
+console.log(`Build version (CFBundleVersion): ${buildVersion}`);
 
 // Read the current source file
 const sourceFilePath = path.join(__dirname, '..', 'Autodarts_Tools_Source.json');
@@ -60,7 +68,7 @@ if (existingVersionIndex !== -1) {
     ...sourceData.apps[appIndex].versions[existingVersionIndex],
     date: currentDate,
     size: ipaSize,
-    buildVersion: version
+    buildVersion: buildVersion
   };
 } else {
   // Add new version to the beginning of the versions array
@@ -70,7 +78,7 @@ if (existingVersionIndex !== -1) {
     localizedDescription: null,
     downloadURL: "https://github.com/creazy231/tools-for-autodarts/releases/latest/download/autodarts-tools-ios.ipa",
     size: ipaSize,
-    buildVersion: version,
+    buildVersion: buildVersion,
     minOSVersion: "15.6"
   };
 
